@@ -1,0 +1,123 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+// Import database connection (to ensure connection is established)
+import pool from './config/db.js';
+
+// Import routes
+import schoolRoutes from './routes/schoolRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
+import leadRoutes from './routes/leadRoutes.js';
+import admissionRoutes from './routes/admissionRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
+
+dotenv.config();
+
+// Create Express app
+const app = express();
+
+// ============================================================================
+// MIDDLEWARE
+// ============================================================================
+
+// CORS configuration
+app.use(cors({
+  origin: [
+    process.env.CORS_ORIGIN || 'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+  ],
+  credentials: true,
+}));
+
+// Body parser middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// ============================================================================
+// HEALTH CHECK ENDPOINT
+// ============================================================================
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: '🎓 School ERP Backend API',
+    version: '1.0.0',
+    status: 'Running',
+    endpoints: {
+      health:     'GET  /api/health',
+      schools:    'GET  /api/schools',
+      students:   'GET  /api/students',
+      leads:      'GET  /api/leads',
+      admissions: 'GET  /api/admissions',
+    },
+  });
+});
+
+
+// ============================================================================
+// API ROUTES
+// ============================================================================
+
+// School routes
+app.use('/api/schools', schoolRoutes);
+
+// Student routes
+app.use('/api/students', studentRoutes);
+
+// Lead routes
+app.use('/api/leads', leadRoutes);
+
+// Admission routes
+app.use('/api/admissions', admissionRoutes);
+
+// Applications alias to admissions controller
+app.use('/api/applications', admissionRoutes);
+
+// Parent routes
+app.use('/api/parents', parentRoutes);
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
+
+// 404 Not Found
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.path,
+    method: req.method,
+  });
+});
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error('Global Error Handler:', error);
+
+  res.status(error.status || 500).json({
+    success: false,
+    message: error.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+  });
+});
+
+export default app;
