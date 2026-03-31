@@ -1,235 +1,184 @@
-import pool from '../config/db.js';
-import { createLeadService } from '../services/lead.service.js';
-
 /**
- * Lead Controller
- * Handles all lead-related endpoints for prospective students
+ * controllers/leadController.js
+ * HTTP request handlers for Lead management
+ * All functions use try/catch with next(err) for error handling
+ * school_id always from req.user.school_id (never from request body)
+ * created_by always from req.user.id
+ * Responses follow consistent JSON shape: { success: bool, data?: ..., message?: ... }
  */
 
-// Get all leads for a school
-const getAllLeads = async (req, res) => {
-  const { school_id, status, page = 1, limit = 10 } = req.query;
-  const offset = (page - 1) * limit;
+import * as leadQueries from '../db/queries/leadQueries.js';
+import pool from '../config/db.js';
 
+/**
+ * createLead(req, res, next)
+ * POST /api/leads
+ * Validates phone is present, inserts new lead, returns 201 with created lead
+ */
+export const createLead = async (req, res, next) => {
   try {
-    let query = `SELECT 
-      l.id,
-      l.first_name,
-      l.last_name,
-      l.email,
-      l.phone,
-      l.desired_class,
-      l.source,
-      l.follow_up_status,
-      l.assigned_to,
-      l.last_contacted_at,
-      sh.name as school_name,
-      ay.year_name as academic_year,
-      l.created_at
-    FROM lead l
-    JOIN school sh ON l.school_id = sh.id
-    JOIN academic_year ay ON l.academic_year_id = ay.id
-    WHERE 1=1`;
-
-    const params = [];
-
-    if (school_id) {
-      query += ` AND l.school_id = $${params.length + 1}`;
-      params.push(school_id);
-    }
-
-    if (status) {
-      query += ` AND l.follow_up_status = $${params.length + 1}`;
-      params.push(status);
-    }
-
-    // Get total count
-    const countQuery = `SELECT COUNT(*) as count FROM (${query.replace('SELECT l.id, l.first_name,', 'SELECT 1')}) as cnt`;
-    const countResult = await pool.query(countQuery, params);
-    const totalLeads = parseInt(countResult.rows[0].count);
-
-    // Get paginated data
-    query += ` ORDER BY l.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
-
-    const result = await pool.query(query, params);
-
-    res.status(200).json({
-      success: true,
-      message: 'Leads retrieved successfully',
-      data: result.rows,
-      pagination: {
-        total: totalLeads,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(totalLeads / limit),
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching leads:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching leads',
-      error: error.message,
-    });
-  }
-};
-
-// Search leads by name, email, or phone
-const searchLeads = async (req, res) => {
-  const { q } = req.query;
-  
-  if (!q) {
-    return res.status(400).json({ success: false, message: 'Search query is required' });
-  }
-
-  try {
-    const query = `
-      SELECT 
-        l.*,
-        sh.name as school_name,
-        ay.year_name as academic_year
-      FROM lead l
-      JOIN school sh ON l.school_id = sh.id
-      JOIN academic_year ay ON l.academic_year_id = ay.id
-      WHERE 
-        l.first_name ILIKE $1 
-        OR l.last_name ILIKE $1
-        OR CONCAT(l.first_name, ' ', l.last_name) ILIKE $1
-        OR l.email ILIKE $1 
-        OR l.phone ILIKE $1
-      ORDER BY l.created_at DESC
-      LIMIT 20
-    `;
-    const searchTerm = `%${q}%`;
-    const result = await pool.query(query, [searchTerm]);
-
-    res.status(200).json({
-      success: true,
-      message: 'Search completed',
-      data: result.rows
-    });
-  } catch (error) {
-    console.error('Error searching leads:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error searching leads',
-      error: error.message
-    });
-  }
-};
-
-// Get lead by ID
-const getLeadById = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await pool.query(
-      `SELECT l.*, sh.name as school_name, ay.year_name
-       FROM lead l
-       JOIN school sh ON l.school_id = sh.id
-       JOIN academic_year ay ON l.academic_year_id = ay.id
-       WHERE l.id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Lead not found',
+    const { phone } = req.body;
+    
+    // Validation: Phone is required
+    if (!phone || phone.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Phone number is required." 
       });
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Lead retrieved successfully',
-      data: result.rows[0],
+    // Determine academic_year_id: prefer request, otherwise use active academic year for the school
+    let academic_year_id = req.body.academic_year_id;
+    if (!academic_year_id) {
+      const yearRes = await pool.query(
+        'SELECT id FROM academic_year WHERE school_id = $1 AND is_active = true ORDER BY id DESC LIMIT 1',
+        [req.user.school_id]
+      );
+      academic_year_id = yearRes.rows[0]?.id;
+
+      // fallback: any academic year for the school
+      if (!academic_year_id) {
+        const fallback = await pool.query(
+          'SELECT id FROM academic_year WHERE school_id = $1 ORDER BY id DESC LIMIT 1',
+          [req.user.school_id]
+        );
+        academic_year_id = fallback.rows[0]?.id;
+      }
+    }
+
+    if (!academic_year_id) {
+      return res.status(400).json({ success: false, message: 'No academic year configured for this school.' });
+    }
+
+    // Build lead data - school_id and created_by come from auth, never from body
+    const data = {
+      ...req.body,
+      school_id: req.user.school_id,
+      academic_year_id,
+      created_by: req.user.id,
+      follow_up_status: req.body.follow_up_status || 'pending'
+    };
+
+    const newLead = await leadQueries.createLead(data);
+
+    res.status(201).json({ 
+      success: true, 
+      data: newLead,
+      message: "Lead created successfully."
     });
   } catch (error) {
-    console.error('Error fetching lead:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching lead',
-      error: error.message,
-    });
+    console.error('Lead Controller Error (createLead):', error);
+    next(error);
   }
 };
 
-// Create new lead
-const createLead = async (req, res) => {
+/**
+ * getAllLeads(req, res, next)
+ * GET /api/leads?follow_up_status=pending&desired_class=Grade5&assigned_to=123
+ * Returns array of leads with optional filters, scoped to current school
+ */
+export const getAllLeads = async (req, res, next) => {
   try {
-    const createdLead = await createLeadService(req.body);
-    res.status(201).json({
-      success: true,
-      data: {
-        id: createdLead.id,
-        message: 'Lead created successfully',
-      },
+    const school_id = req.user.school_id;
+    const { follow_up_status, desired_class, assigned_to } = req.query;
+
+    const leads = await leadQueries.getAllLeads(school_id, {
+      follow_up_status,
+      desired_class,
+      assigned_to
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      data: leads
     });
   } catch (error) {
-    if (error.status === 400) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
+    console.error('Lead Controller Error (getAllLeads):', error);
+    next(error);
+  }
+};
+
+/**
+ * getLeadById(req, res, next)
+ * GET /api/leads/:id
+ * Returns 404 if lead not found, otherwise returns single lead
+ */
+export const getLeadById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const school_id = req.user.school_id;
+
+    const lead = await leadQueries.getLeadById(id, school_id);
+
+    if (!lead) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Lead not found." 
       });
     }
 
-    console.error('Error creating lead:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating lead',
-      error: error.message,
+    res.status(200).json({ 
+      success: true, 
+      data: lead 
     });
+  } catch (error) {
+    console.error('Lead Controller Error (getLeadById):', error);
+    next(error);
   }
 };
 
-// Update lead follow-up status
-const updateLeadStatus = async (req, res) => {
-  const { id } = req.params;
-  const { follow_up_status, notes, assigned_to } = req.body;
-
-  if (!follow_up_status) {
-    return res.status(400).json({
-      success: false,
-      message: 'follow_up_status is required',
-    });
-  }
-
+/**
+ * updateLead(req, res, next)
+ * PUT /api/leads/:id
+ * Returns 404 if lead not found, otherwise returns updated lead
+ */
+export const updateLead = async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `UPDATE lead 
-       SET follow_up_status = $1, notes = COALESCE($2, notes), assigned_to = COALESCE($3, assigned_to), last_contacted_at = NOW(), updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [follow_up_status, notes, assigned_to, id]
-    );
+    const { id } = req.params;
+    const school_id = req.user.school_id;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Lead not found',
+    const updatedLead = await leadQueries.updateLead(id, school_id, req.body);
+
+    if (!updatedLead) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Lead not found." 
       });
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Lead status updated successfully',
-      data: result.rows[0],
+    res.status(200).json({ 
+      success: true, 
+      data: updatedLead,
+      message: "Lead updated successfully."
     });
   } catch (error) {
-    console.error('Error updating lead status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating lead status',
-      error: error.message,
-    });
+    console.error('Lead Controller Error (updateLead):', error);
+    next(error);
   }
 };
 
-export {
-  getAllLeads,
-  searchLeads,
-  getLeadById,
-  createLead,
-  updateLeadStatus,
+/**
+ * deleteLead(req, res, next)
+ * DELETE /api/leads/:id
+ * Returns 204 on success, 404 if not found
+ */
+export const deleteLead = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const school_id = req.user.school_id;
+
+    const success = await leadQueries.deleteLead(id, school_id);
+
+    if (!success) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Lead not found." 
+      });
+    }
+
+    res.status(204).end();
+  } catch (error) {
+    console.error('Lead Controller Error (deleteLead):', error);
+    next(error);
+  }
 };

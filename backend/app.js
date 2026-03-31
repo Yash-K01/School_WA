@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import pool from './config/db.js';
 
 // Import routes
+import authRoutes from './routes/authRoutes.js';
 import schoolRoutes from './routes/schoolRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import leadRoutes from './routes/leadRoutes.js';
@@ -76,6 +77,9 @@ app.get('/', (req, res) => {
 // ============================================================================
 // API ROUTES
 // ============================================================================
+
+// Authentication routes (no auth required for login/signup)
+app.use('/api/auth', authRoutes);
 
 // School routes
 app.use('/api/schools', schoolRoutes);
