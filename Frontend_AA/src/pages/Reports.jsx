@@ -70,9 +70,7 @@ export function Reports() {
                 <XAxis type="number" tick={{fill:"#9ca3af",fontSize:11}} axisLine={false} tickLine={false}/>
                 <YAxis type="category" dataKey="stage" tick={{fill:"#6b7280",fontSize:12}} axisLine={false} tickLine={false} width={80}/>
                 <Tooltip content={<Tip/>}/>
-                <Bar dataKey="count" name="count" radius={[0,6,6,0]}>
-                  {funnelData.map((e,i)=><Cell key={i} fill={i===2?"#d1d5db":"#14b8a6"}/>)}
-                </Bar>
+                <Bar dataKey="count" name="count" fill="#14b8a6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
