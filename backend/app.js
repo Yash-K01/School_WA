@@ -11,6 +11,7 @@ import schoolRoutes from './routes/schoolRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import leadRoutes from './routes/leadRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
+import applicationRoutes from './routes/applicationRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
 
 dotenv.config();
@@ -93,8 +94,8 @@ app.use('/api/leads', leadRoutes);
 // Admission routes
 app.use('/api/admissions', admissionRoutes);
 
-// Applications alias to admissions controller
-app.use('/api/applications', admissionRoutes);
+// Application routes (multi-step form)
+app.use('/api/applications', applicationRoutes);
 
 // Parent routes
 app.use('/api/parents', parentRoutes);

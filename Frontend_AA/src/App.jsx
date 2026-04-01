@@ -10,6 +10,7 @@ import { ScheduleVisit } from "./pages/ScheduleVisit";
 import { Applications } from "./pages/Applications";
 import { CreateApplication } from "./pages/CreateApplication";
 import { NewApplication } from "./pages/NewApplication";
+import { MultiStepApplication } from "./pages/MultiStepApplication";
 import { Screening } from "./pages/Screening";
 import { OffersSeats } from "./pages/OffersSeats";
 import { FeesPayments } from "./pages/FeesPayments";
@@ -50,6 +51,10 @@ export default function App() {
           <Route path="counseling/schedule-visit" element={<ScheduleVisit />} />
           <Route path="applications" element={<Applications />} />
           <Route path="applications/create" element={<CreateApplication />} />
+          <Route
+            path="applications/form/:id"
+            element={<MultiStepApplication />}
+          />
           <Route path="applications/new" element={<NewApplication />} />
           <Route path="screening" element={<Screening />} />
           <Route path="offers-seats" element={<OffersSeats />} />

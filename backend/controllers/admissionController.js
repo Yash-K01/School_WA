@@ -8,8 +8,11 @@ import pool from '../config/db.js';
 export const getAdmissionStats = async (req, res) => {
   try {
     const stats = await admissionService.getAdmissionStats();
-    // Return the full stats object as requested
-    res.json(stats);
+    res.json({
+      success: true,
+      data: stats,
+      message: 'Admission statistics retrieved successfully'
+    });
   } catch (error) {
     console.error('Error fetching admission stats:', error);
     res.status(500).json({

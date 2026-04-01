@@ -141,9 +141,17 @@ This project models applications as a page-based feature. Files of interest:
   - Choose academic year and admission type
   - Continue to the full application form (navigates to `/applications/new`)
 - Expected lead object when selecting:
+
 ```json
-{ "id": "1", "name": "Aarav Sharma", "grade": "Grade 5", "contact": "+91...", "email": "..." }
+{
+  "id": "1",
+  "name": "Aarav Sharma",
+  "grade": "Grade 5",
+  "contact": "+91...",
+  "email": "..."
+}
 ```
+
 - Props: none (page-level)
 - State:
   - `step` ("select" | "create")
@@ -164,6 +172,7 @@ This project models applications as a page-based feature. Files of interest:
   6. Review & Submit → `POST /api/admissions`
 
 - Expected final submission shape (example):
+
 ```json
 {
   "lead_id": 1,

@@ -1,0 +1,193 @@
+import { useState, useEffect } from 'react';
+import {
+  getApplicationProgress,
+  getApplicationDetails,
+  saveStudentInfo,
+  saveParentInfo,
+  saveAcademicInfo,
+  saveDocuments,
+  submitApplication
+} from '../services/applicationService.js';
+
+/**
+ * Custom hook for managing multi-step application
+ * Handles progress tracking, data fetching, and step saving
+ */
+export function useApplication(applicationId) {
+  const [progress, setProgress] = useState(null);
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Load progress and details on mount
+  useEffect(() => {
+    if (!applicationId) return;
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch progress and details in parallel
+        const [progressData, detailsData] = await Promise.all([
+          getApplicationProgress(applicationId),
+          getApplicationDetails(applicationId)
+        ]);
+
+        setProgress(progressData);
+        setDetails(detailsData);
+        setCurrentStep(progressData.current_step || 1);
+
+        console.log('✅ Application loaded:', {
+          current_step: progressData.current_step,
+          steps: progressData.steps
+        });
+      } catch (err) {
+        console.error('❌ Error loading application:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [applicationId]);
+
+  // Save student info and advance to next step
+  const handleSaveStudentInfo = async (studentData) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await saveStudentInfo(applicationId, studentData);
+
+      // Update progress
+      const updatedProgress = await getApplicationProgress(applicationId);
+      setProgress(updatedProgress);
+      setCurrentStep(updatedProgress.current_step);
+
+      console.log('✅ Student info saved, advancing to step:', updatedProgress.current_step);
+      return true;
+    } catch (err) {
+      console.error('❌ Error saving student info:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save parent info and advance to next step
+  const handleSaveParentInfo = async (parentData) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await saveParentInfo(applicationId, parentData);
+
+      const updatedProgress = await getApplicationProgress(applicationId);
+      setProgress(updatedProgress);
+      setCurrentStep(updatedProgress.current_step);
+
+      console.log('✅ Parent info saved, advancing to step:', updatedProgress.current_step);
+      return true;
+    } catch (err) {
+      console.error('❌ Error saving parent info:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save academic info and advance to next step
+  const handleSaveAcademicInfo = async (academicData) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await saveAcademicInfo(applicationId, academicData);
+
+      const updatedProgress = await getApplicationProgress(applicationId);
+      setProgress(updatedProgress);
+      setCurrentStep(updatedProgress.current_step);
+
+      console.log('✅ Academic info saved, advancing to step:', updatedProgress.current_step);
+      return true;
+    } catch (err) {
+      console.error('❌ Error saving academic info:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save documents and advance to next step
+  const handleSaveDocuments = async (documents) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await saveDocuments(applicationId, documents);
+
+      const updatedProgress = await getApplicationProgress(applicationId);
+      setProgress(updatedProgress);
+      setCurrentStep(updatedProgress.current_step);
+
+      console.log('✅ Documents saved, advancing to step:', updatedProgress.current_step);
+      return true;
+    } catch (err) {
+      console.error('❌ Error saving documents:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Submit application
+  const handleSubmitApplication = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await submitApplication(applicationId);
+
+      const updatedProgress = await getApplicationProgress(applicationId);
+      setProgress(updatedProgress);
+
+      console.log('✅ Application submitted!');
+      return true;
+    } catch (err) {
+      console.error('❌ Error submitting application:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if step is completed
+  const isStepCompleted = (step) => {
+    if (!progress) return false;
+    const stepKey = `step_${step}_${Object.keys(progress.steps)[step - 1]}`.toLowerCase();
+    return progress.steps[Object.keys(progress.steps)[step - 1]] === 'completed';
+  };
+
+  return {
+    applicationId,
+    progress,
+    details,
+    loading,
+    error,
+    currentStep,
+    isStepCompleted,
+    handleSaveStudentInfo,
+    handleSaveParentInfo,
+    handleSaveAcademicInfo,
+    handleSaveDocuments,
+    handleSubmitApplication
+  };
+}
