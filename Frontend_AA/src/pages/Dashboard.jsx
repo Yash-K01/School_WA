@@ -497,11 +497,7 @@ export function Dashboard() {
                   width={70}
                 />
                 <Tooltip content={<Tip />} />
-                <Bar dataKey="count" name="count" radius={[0, 6, 6, 0]}>
-                  {funnelData.map((e, i) => (
-                    <Cell key={i} fill={i === 2 ? "#d1d5db" : "#14b8a6"} />
-                  ))}
-                </Bar>
+                <Bar dataKey="count" name="count" fill="#14b8a6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div

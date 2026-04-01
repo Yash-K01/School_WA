@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, TrendingUp, MessageSquare, UserCheck, FileText, ClipboardCheck, Award, CreditCard, GraduationCap, BarChart3, Shield, Settings as SettingsIcon, ChevronDown, ChevronRight } from "lucide-react";
 import schoolLogo from "../assets/school-logo.png";
 import sLogo from "../assets/sc-logo.png";
+import Full from "../assets/full.png";
 import "../style.css";
 
 const navItems = [
@@ -39,7 +40,7 @@ export function Layout() {
           <div className="logo-icon" onClick={toggleCollapse} style={{ cursor: "pointer" }}>
             {collapsed ? (
               <img 
-                src={sLogo} 
+                src={sLogo}
                 alt="Sacred Tree" 
                 className="scl-logo"
                 style={{ width: "32px", height: "32px", objectFit: "contain" }}
@@ -56,8 +57,12 @@ export function Layout() {
           
           {!collapsed && (
             <div className="logo-text-wrap">
-              <div className="school-name">Sacred Tree</div>
-              <div className="school-sub">International School</div>
+              <img 
+                src={Full} 
+                alt="Sacred Tree International School" 
+                className="logo-image"
+                style={{ width: "40px", height: "40px", objectFit: "contain" }}
+              />
             </div>
           )}
         </div>
