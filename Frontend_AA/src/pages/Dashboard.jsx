@@ -30,69 +30,57 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import "../style.css";
 
-const stats = [
+const statMeta = [
   {
     label: "Total Inquiries",
-    value: "1234",
-    change: "+12%",
-    pos: true,
+    key: "totalInquiries",
     icon: Users,
     color: "var(--blue-bg)",
     ic: "var(--blue)",
   },
   {
     label: "Conversion Rate",
-    value: "34.5%",
-    change: "+5.2%",
-    pos: true,
+    key: "conversionRate",
     icon: TrendingUp,
     color: "var(--green-bg)",
     ic: "var(--green)",
+    format: (v) => `${v}%`,
   },
   {
     label: "Active Leads",
-    value: "456",
-    change: "+8%",
-    pos: true,
+    key: "activeLeads",
     icon: Users,
     color: "var(--purple-bg)",
     ic: "var(--purple)",
   },
   {
     label: "Enrolled Students",
-    value: "234",
-    change: "+15%",
-    pos: true,
+    key: "enrolledStudents",
     icon: GraduationCap,
     color: "var(--green-bg)",
     ic: "var(--green)",
   },
   {
     label: "Pending Applications",
-    value: "89",
-    change: "-5%",
-    pos: false,
+    key: "pendingApplications",
     icon: FileText,
     color: "var(--red-bg)",
     ic: "var(--red)",
   },
   {
     label: "Offers Sent",
-    value: "156",
-    change: "+22%",
-    pos: true,
+    key: "offersSent",
     icon: Award,
     color: "var(--yellow-bg)",
     ic: "var(--yellow)",
   },
   {
     label: "Fees Collected",
-    value: "₹45.2L",
-    change: "+18%",
-    pos: true,
+    key: "feesCollected",
     icon: DollarSign,
     color: "var(--green-bg)",
     ic: "var(--green)",
+    format: (v) => `₹${Number(v).toLocaleString()}`,
   },
 ];
 
@@ -106,15 +94,6 @@ const monthlyData = [
   { month: "Feb", inquiries: 256, enrolled: 89 },
 ];
 
-const funnelData = [
-  { stage: "Inquiry", count: 1234, pct: "100%" },
-  { stage: "Contacted", count: 980, pct: "79%" },
-  { stage: "Interested", count: 756, pct: "61%" },
-  { stage: "Visit", count: 535, pct: "43%" },
-  { stage: "Applied", count: 423, pct: "34%" },
-  { stage: "Enrolled", count: 234, pct: "19%" },
-];
-
 const gradeData = [
   { label: "Grade 1", value: 45, color: "#22c55e" },
   { label: "Grade 2", value: 38, color: "#3b82f6" },
@@ -124,222 +103,237 @@ const gradeData = [
   { label: "Grade 6", value: 34, color: "#14b8a6" },
 ];
 
-const followUps = [
-  {
-    name: "Aarav Sharma",
-    sub: "Rajesh Sharma",
-    time: "10:00 AM",
-    action: "Call",
-    actionCls: "action-call",
-    av: "AS",
-    avBg: "#dbeafe",
-    avC: "#1d4ed8",
-  },
-  {
-    name: "Diya Patel",
-    sub: "Amit Patel",
-    time: "11:00 AM",
-    action: "Campus Visit",
-    actionCls: "action-visit",
-    av: "DP",
-    avBg: "#f3e8ff",
-    avC: "#7e22ce",
-  },
-  {
-    name: "Arjun Kumar",
-    sub: "Amit Kumar",
-    time: "2:00 PM",
-    action: "Email",
-    actionCls: "action-email",
-    av: "AK",
-    avBg: "#dcfce7",
-    avC: "#15803d",
-  },
-  {
-    name: "Ananya Singh",
-    sub: "Vikram Singh",
-    time: "3:30 PM",
-    action: "Interview",
-    actionCls: "action-interview",
-    av: "AS",
-    avBg: "#fef9c3",
-    avC: "#a16207",
-  },
-];
-
-const alerts = [
-  {
-    name: "Rohan Verma",
-    grade: "Grade 5",
-    reason: "No response",
-    days: "15 days ago",
-  },
-  {
-    name: "Meera Reddy",
-    grade: "Grade 3",
-    reason: "Awaiting documents",
-    days: "12 days ago",
-  },
-  {
-    name: "Kabir Joshi",
-    grade: "Grade 8",
-    reason: "Payment pending",
-    days: "18 days ago",
-  },
-];
-
-const counselors = [
-  { name: "Priya Sharma", leads: 45, conv: 18, pct: 40, clr: "#14b8a6" },
-  { name: "Amit Patel", leads: 38, conv: 12, pct: 32, clr: "#3b82f6" },
-  { name: "Neha Kumar", leads: 42, conv: 15, pct: 36, clr: "#8b5cf6" },
-  { name: "Rahul Singh", leads: 35, conv: 9, pct: 26, clr: "#f59e0b" },
-];
-
-const Tip = ({ active, payload, label }) =>
-  active && payload?.length ? (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 8,
-        padding: "10px 14px",
-        boxShadow: "0 4px 12px rgba(0,0,0,.1)",
-        fontSize: 13,
-      }}
-    >
-      <p style={{ fontWeight: 700, color: "#111", marginBottom: 4 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, fontWeight: 500 }}>
-          {p.name} : {p.value}
+const Tip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div
+        className="card"
+        style={{
+          padding: "8px 12px",
+          border: "1px solid var(--gray-200)",
+          boxShadow: "var(--sh)",
+        }}
+      >
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+          {label || payload[0].name}
         </p>
-      ))}
-    </div>
-  ) : null;
-
+        {payload.map((entry, index) => (
+          <p
+            key={index}
+            style={{ margin: 0, fontSize: 12, color: entry.color }}
+          >
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 export function Dashboard() {
+  // Funnel data state (must be inside component)
+  const [funnelData, setFunnelData] = useState([
+    { stage: "Inquiry", count: 0 },
+    { stage: "Contacted", count: 0 },
+    { stage: "Interested", count: 0 },
+    { stage: "Visit", count: 0 },
+    { stage: "Applied", count: 0 },
+    { stage: "Enrolled", count: 0 },
+  ]);
+
+  // Fetch funnel data from backend (must be inside component)
+  const fetchFunnelData = async () => {
+    try {
+      const { data } = await axios.get("/api/dashboard/funnel");
+      // Map backend response to chart format
+      const funnelArr = [
+        { stage: "Inquiry", count: data.inquiry },
+        { stage: "Contacted", count: data.contacted },
+        { stage: "Interested", count: data.interested },
+        { stage: "Visit", count: data.visit },
+        { stage: "Applied", count: data.applied },
+        { stage: "Enrolled", count: data.enrolled },
+      ];
+      setFunnelData(funnelArr);
+    } catch (err) {
+      setFunnelData([
+        { stage: "Inquiry", count: 0 },
+        { stage: "Contacted", count: 0 },
+        { stage: "Interested", count: 0 },
+        { stage: "Visit", count: 0 },
+        { stage: "Applied", count: 0 },
+        { stage: "Enrolled", count: 0 },
+      ]);
+    }
+  };
   const navigate = useNavigate();
-  const [backendStatus, setBackendStatus] = useState("loading");
+  const [statsData, setStatsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Optionally, get schoolId from context/auth if needed
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await axios.get("/api/dashboard");
+      setStatsData(data);
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          err.message ||
+          "Failed to load dashboard stats",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [backendStatus, setBackendStatus] = useState("connected");
   const [backendError, setBackendError] = useState(null);
 
   const checkBackendHealth = async () => {
-    setBackendStatus("loading");
-    setBackendError(null);
-
     try {
-      const response = await axios.get("/api/health", { timeout: 5000 });
-
-      if (response.data?.success) {
-        setBackendStatus("connected");
-      } else {
-        setBackendStatus("error");
-        setBackendError("Invalid response from server");
-      }
+      setBackendStatus("checking");
+      await axios.get("/api/health"); // Change as needed
+      setBackendStatus("connected");
     } catch (err) {
       setBackendStatus("error");
-      setBackendError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to connect to backend",
-      );
+      setBackendError(err.message);
     }
   };
 
   useEffect(() => {
+    fetchDashboardStats();
+    fetchFunnelData();
     checkBackendHealth();
-    // Auto-refresh every 10 seconds (bonus feature)
-    const interval = setInterval(checkBackendHealth, 10000);
-    return () => clearInterval(interval);
   }, []);
+
+  const stats = statMeta.map((m) => ({
+    ...m,
+    value: statsData ? statsData[m.key] : "-",
+    change: "+2%", // default
+    pos: true,
+  }));
+
+  const followUps = [
+    {
+      name: "Rahul Sharma",
+      sub: "Class 1 Inquiry",
+      time: "10:30 AM",
+      av: "RS",
+      avBg: "#e0f2fe",
+      avC: "#0284c7",
+      action: "Call",
+      actionCls: "action-call",
+    },
+    {
+      name: "Sanya Malhotra",
+      sub: "Document Pending",
+      time: "11:45 AM",
+      av: "SM",
+      avBg: "#fef2f2",
+      avC: "#dc2626",
+      action: "Email",
+      actionCls: "action-email",
+    },
+    {
+      name: "Kevin Peter",
+      sub: "Campus Visit",
+      time: "02:15 PM",
+      av: "KP",
+      avBg: "#f3e8ff",
+      avC: "#7e22ce",
+      action: "Visit",
+      actionCls: "action-visit",
+    },
+    {
+      name: "Arya Singh",
+      sub: "Interview",
+      time: "04:30 PM",
+      av: "AS",
+      avBg: "#fef9c3",
+      avC: "#a16207",
+      action: "Inquiry",
+      actionCls: "action-interview",
+    },
+  ];
+
+  const alerts = [
+    {
+      name: "John Doe",
+      grade: "Grade 5",
+      reason: "Waitlisted - No update since 5 days",
+      days: "5d",
+    },
+    {
+      name: "Sara Khan",
+      grade: "Grade 2",
+      reason: "Payment pending - admission stage",
+      days: "3d",
+    },
+  ];
+
+  const counselors = [
+    { name: "Nisha Gupta", pct: 68, leads: 120, conv: 82, clr: "#14b8a6" },
+    { name: "Arjun Rao", pct: 54, leads: 95, conv: 51, clr: "#3b82f6" },
+    { name: "Priya Singh", pct: 42, leads: 88, conv: 37, clr: "#f59e0b" },
+  ];
 
   return (
     <div className="page">
-      {/* Backend Status Indicator */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: 16,
-        }}
-      >
-        {backendStatus === "connected" && (
-          <div
+      {/* Loading/Error State */}
+      {loading && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            background: "#fef3c7",
+            border: "1px solid #fde68a",
+            borderRadius: 6,
+            color: "#92400e",
+          }}
+        >
+          Loading dashboard stats...
+        </div>
+      )}
+      {error && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            background: "#fee2e2",
+            border: "1px solid #fecaca",
+            borderRadius: 6,
+            color: "#991b1b",
+          }}
+        >
+          ⚠️ {error}
+          <button
+            onClick={fetchDashboardStats}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 14px",
-              backgroundColor: "#dcfce7",
-              border: "1px solid #86efac",
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 500,
-              color: "#15803d",
+              marginLeft: 12,
+              padding: "2px 8px",
+              fontSize: 12,
+              border: "1px solid #991b1b",
+              borderRadius: 4,
+              background: "#fff",
+              cursor: "pointer",
             }}
           >
-            <span>🟢</span>
-            <span>Backend Connected</span>
-            <button
-              onClick={checkBackendHealth}
-              style={{
-                marginLeft: 8,
-                padding: "2px 6px",
-                fontSize: 11,
-                backgroundColor: "transparent",
-                border: "1px solid #15803d",
-                color: "#15803d",
-                borderRadius: 4,
-                cursor: "pointer",
-                fontWeight: 500,
-                background: "rgba(21,128,61,0.1)",
-              }}
-            >
-              Refresh
-            </button>
-          </div>
-        )}
-        {backendStatus === "error" && (
+            Retry
+          </button>
+        </div>
+      )}
+      {/* Backend Health Status Section */}
+      <div style={{ marginBottom: 16 }}>
+        {backendStatus === "checking" && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 8,
-              padding: "8px 14px",
-              backgroundColor: "#fee2e2",
-              border: "1px solid #fca5a5",
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 500,
-              color: "#991b1b",
-            }}
-          >
-            <span>🔴</span>
-            <span>Backend Not Connected</span>
-            <button
-              onClick={checkBackendHealth}
-              style={{
-                marginLeft: 8,
-                padding: "2px 6px",
-                fontSize: 11,
-                backgroundColor: "transparent",
-                border: "1px solid #991b1b",
-                color: "#991b1b",
-                borderRadius: 4,
-                cursor: "pointer",
-                fontWeight: 500,
-                background: "rgba(153,27,27,0.1)",
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        )}
-        {backendStatus === "loading" && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 14px",
+              padding: "8px 12px",
               backgroundColor: "#fef3c7",
               border: "1px solid #fcd34d",
               borderRadius: 6,
@@ -352,24 +346,67 @@ export function Dashboard() {
             <span>Checking connection...</span>
           </div>
         )}
+        {backendStatus === "connected" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 10px",
+              fontSize: 12,
+              color: "#16a34a",
+              fontWeight: 500,
+            }}
+          >
+            <span>Backend Connected</span>
+            <button
+              onClick={checkBackendHealth}
+              style={{
+                marginLeft: 8,
+                padding: "2px 6px",
+                fontSize: 11,
+                backgroundColor: "transparent",
+                border: "1px solid #16a34a",
+                color: "#16a34a",
+                borderRadius: 4,
+                cursor: "pointer",
+                fontWeight: 500,
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        )}
+        {backendStatus === "error" && backendError && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 12,
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: 6,
+              fontSize: 12,
+              color: "#7f1d1d",
+            }}
+          >
+            ⚠️ {backendError}
+            <button
+              onClick={checkBackendHealth}
+              style={{
+                marginLeft: 12,
+                padding: "2px 8px",
+                fontSize: 11,
+                border: "1px solid #991b1b",
+                borderRadius: 4,
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Error Details (if any) */}
-      {backendStatus === "error" && backendError && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: 12,
-            backgroundColor: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: 6,
-            fontSize: 12,
-            color: "#7f1d1d",
-          }}
-        >
-          ⚠️ {backendError}
-        </div>
-      )}
       {/* Header */}
       <div
         style={{
@@ -497,7 +534,12 @@ export function Dashboard() {
                   width={70}
                 />
                 <Tooltip content={<Tip />} />
-                <Bar dataKey="count" name="count" fill="#14b8a6" radius={[0, 6, 6, 0]} />
+                <Bar
+                  dataKey="count"
+                  name="count"
+                  fill="#14b8a6"
+                  radius={[0, 6, 6, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
             <div

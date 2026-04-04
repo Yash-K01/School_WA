@@ -13,6 +13,8 @@ import leadRoutes from './routes/leadRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import applicationRoutes from './routes/applicationRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import funnelRoutes from './src/routes/funnelRoutes.js';
 
 dotenv.config();
 
@@ -99,6 +101,12 @@ app.use('/api/applications', applicationRoutes);
 
 // Parent routes
 app.use('/api/parents', parentRoutes);
+
+// Dashboard routes
+app.use('/api', dashboardRoutes);
+
+// Funnel routes
+app.use('/api', funnelRoutes);
 
 // ============================================================================
 // ERROR HANDLING

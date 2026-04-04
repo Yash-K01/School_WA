@@ -557,3 +557,8 @@ console.log(token);
 | `routes/leadRoutes.js`          | ✅ Updated | API routes with auth       |
 
 All files are production-ready and fully documented!
+
+
+
+
+i have done those changes in database, now give me propte for creation backend logic including all rout controllers and servicess file and connection to front end for 1.Total Inquiries 2.Conversion Rate 3.Active Leads 4.Enrolled Student 5.Pending Applications 6.Offers Sent 7.Fees Collected. also discribe the which table and its coloum will connect to the which widegt

@@ -181,6 +181,7 @@ CREATE TABLE lead (
     )
   ),
   notes TEXT,
+  inactivity_reason VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   assigned_to VARCHAR(100),
@@ -970,6 +971,7 @@ CREATE TABLE lead_activity (
     outcome IN ('positive', 'negative', 'neutral', 'pending')
   ),
   next_follow_up_date DATE,
+  scheduled_time TIME,
   created_by BIGINT REFERENCES app_user(id) ON DELETE
   SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
