@@ -1,4 +1,4 @@
-import pool from '../../db/pool.js';
+import pool from '../../config/db.js';
 
 // Helper to log and return 0 if null
 const safeNumber = (val) => (val === null ? 0 : Number(val));

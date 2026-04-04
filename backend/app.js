@@ -124,7 +124,12 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((error, req, res, next) => {
-  console.error('Global Error Handler:', error);
+  console.error('❌ [SERVER ERROR]', {
+    message: error.message,
+    path: req.path,
+    method: req.method,
+    stack: error.stack,
+  });
 
   res.status(error.status || 500).json({
     success: false,

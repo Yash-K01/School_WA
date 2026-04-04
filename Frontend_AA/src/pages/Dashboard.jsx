@@ -1,3 +1,6 @@
+// ...existing code...
+// Map statsData to statMeta for rendering stats grid
+// (MUST be after all imports and inside the Dashboard component)
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -131,90 +134,106 @@ const Tip = ({ active, payload, label }) => {
   return null;
 };
 export function Dashboard() {
-  // Funnel data state (must be inside component)
-  const [funnelData, setFunnelData] = useState([
-    { stage: "Inquiry", count: 0 },
-    { stage: "Contacted", count: 0 },
-    { stage: "Interested", count: 0 },
-    { stage: "Visit", count: 0 },
-    { stage: "Applied", count: 0 },
-    { stage: "Enrolled", count: 0 },
-  ]);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [statsData, setStatsData] = useState(null);
+  const [statsError, setStatsError] = useState(null);
+  const [funnelData, setFunnelData] = useState([]);
+  const [funnelError, setFunnelError] = useState(null);
+
+  const stats = statMeta.map((m) => ({
+    ...m,
+    value: statsData
+      ? m.format
+        ? m.format(statsData[m.key] || 0)
+        : (statsData[m.key] || 0).toLocaleString()
+      : m.format
+        ? m.format(0)
+        : "0",
+    change: statsData ? statsData[`${m.key}Change`] || "+0%" : "+0%",
+    pos: statsData
+      ? (statsData[`${m.key}Change`]?.startsWith("+") ?? true)
+      : true,
+  }));
 
   // Fetch funnel data from backend (must be inside component)
-  const fetchFunnelData = async () => {
+  const fetchFunnelData = async (signal) => {
     try {
-      const { data } = await axios.get("/api/dashboard/funnel");
-      // Map backend response to chart format
+      const { data } = await axios.get("/api/dashboard/funnel", { signal });
+      if (signal?.aborted) return;
+      const total = data.inquiry || 1;
       const funnelArr = [
-        { stage: "Inquiry", count: data.inquiry },
-        { stage: "Contacted", count: data.contacted },
-        { stage: "Interested", count: data.interested },
-        { stage: "Visit", count: data.visit },
-        { stage: "Applied", count: data.applied },
-        { stage: "Enrolled", count: data.enrolled },
+        { stage: "Inquiry", count: data.inquiry, pct: "100%" },
+        { stage: "Contacted", count: data.contacted, pct: Math.round((data.contacted / total) * 100) + "%" },
+        { stage: "Interested", count: data.interested, pct: Math.round((data.interested / total) * 100) + "%" },
+        { stage: "Visit", count: data.visit, pct: Math.round((data.visit / total) * 100) + "%" },
+        { stage: "Applied", count: data.applied, pct: Math.round((data.applied / total) * 100) + "%" },
+        { stage: "Enrolled", count: data.enrolled, pct: Math.round((data.enrolled / total) * 100) + "%" },
       ];
       setFunnelData(funnelArr);
     } catch (err) {
+      if (signal?.aborted) return;
+      const msg = err.response?.data?.error || err.message || "Failed to load funnel data";
+      const detail = err.response?.data?.detail ? ` (${err.response.data.detail})` : "";
+      setFunnelError(msg + detail);
       setFunnelData([
-        { stage: "Inquiry", count: 0 },
-        { stage: "Contacted", count: 0 },
-        { stage: "Interested", count: 0 },
-        { stage: "Visit", count: 0 },
-        { stage: "Applied", count: 0 },
-        { stage: "Enrolled", count: 0 },
+        { stage: "Inquiry", count: 0, pct: "0%" },
+        { stage: "Contacted", count: 0, pct: "0%" },
+        { stage: "Interested", count: 0, pct: "0%" },
+        { stage: "Visit", count: 0, pct: "0%" },
+        { stage: "Applied", count: 0, pct: "0%" },
+        { stage: "Enrolled", count: 0, pct: "0%" },
       ]);
     }
   };
-  const navigate = useNavigate();
-  const [statsData, setStatsData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   // Optionally, get schoolId from context/auth if needed
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = async (signal) => {
     setLoading(true);
-    setError(null);
+    setStatsError(null);
     try {
-      const { data } = await axios.get("/api/dashboard");
+      const { data } = await axios.get("/api/dashboard", { signal });
+      if (signal?.aborted) return;
       setStatsData(data);
     } catch (err) {
-      setError(
-        err.response?.data?.error ||
-          err.message ||
-          "Failed to load dashboard stats",
-      );
+      if (signal?.aborted) return;
+      const msg = err.response?.data?.error || err.message || "Failed to load stats";
+      const detail = err.response?.data?.detail ? ` (${err.response.data.detail})` : "";
+      setStatsError(msg + detail);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
-  const [backendStatus, setBackendStatus] = useState("connected");
+  const [backendStatus, setBackendStatus] = useState("unknown");
   const [backendError, setBackendError] = useState(null);
 
-  const checkBackendHealth = async () => {
+  const checkBackendHealth = async (signal) => {
     try {
       setBackendStatus("checking");
-      await axios.get("/api/health"); // Change as needed
+      await axios.get("/api/health", { signal });
+      if (signal?.aborted) return;
       setBackendStatus("connected");
+      setBackendError(null);
     } catch (err) {
+      if (signal?.aborted) return;
       setBackendStatus("error");
       setBackendError(err.message);
     }
   };
 
+  // Initial data load on mount
   useEffect(() => {
-    fetchDashboardStats();
-    fetchFunnelData();
-    checkBackendHealth();
+    const controller = new AbortController();
+    setStatsError(null);
+    setFunnelError(null);
+    fetchDashboardStats(controller.signal);
+    fetchFunnelData(controller.signal);
+    checkBackendHealth(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, []);
-
-  const stats = statMeta.map((m) => ({
-    ...m,
-    value: statsData ? statsData[m.key] : "-",
-    change: "+2%", // default
-    pos: true,
-  }));
 
   const followUps = [
     {
@@ -297,7 +316,7 @@ export function Dashboard() {
           Loading dashboard stats...
         </div>
       )}
-      {error && (
+      {(statsError || funnelError) && (
         <div
           style={{
             marginBottom: 16,
@@ -308,21 +327,44 @@ export function Dashboard() {
             color: "#991b1b",
           }}
         >
-          ⚠️ {error}
-          <button
-            onClick={fetchDashboardStats}
-            style={{
-              marginLeft: 12,
-              padding: "2px 8px",
-              fontSize: 12,
-              border: "1px solid #991b1b",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Retry
-          </button>
+          {statsError && (
+            <div>
+              ⚠️ {statsError}
+              <button
+                onClick={() => fetchDashboardStats()}
+                style={{
+                  marginLeft: 12,
+                  padding: "2px 8px",
+                  fontSize: 12,
+                  border: "1px solid #991b1b",
+                  borderRadius: 4,
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {funnelError && (
+            <div>
+              ⚠️ {funnelError}
+              <button
+                onClick={() => fetchFunnelData()}
+                style={{
+                  marginLeft: 12,
+                  padding: "2px 8px",
+                  fontSize: 12,
+                  border: "1px solid #991b1b",
+                  borderRadius: 4,
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       )}
       {/* Backend Health Status Section */}

@@ -1,12 +1,12 @@
-import pool from '../../db/pool.js';
+import pool from '../../config/db.js';
 
 export async function getAdmissionFunnel(schoolId) {
   const query = `
     SELECT
       COUNT(*) AS inquiry,
-      COUNT(*) FILTER (WHERE l.status = 'contacted') AS contacted,
-      COUNT(*) FILTER (WHERE l.status = 'interested') AS interested,
-      COUNT(*) FILTER (WHERE l.status = 'visit') AS visit,
+      COUNT(*) FILTER (WHERE l.follow_up_status = 'contacted') AS contacted,
+      COUNT(*) FILTER (WHERE l.follow_up_status = 'interested') AS interested,
+      COUNT(*) FILTER (WHERE l.follow_up_status = 'visit') AS visit,
       COUNT(DISTINCT a.lead_id) AS applied,
       COUNT(*) FILTER (WHERE a.status = 'approved') AS enrolled
     FROM lead l
