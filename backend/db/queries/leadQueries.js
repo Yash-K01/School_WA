@@ -136,3 +136,56 @@ export const deleteLead = async (id, school_id) => {
   const result = await pool.query(sql, [id, school_id]);
   return result.rowCount > 0;
 };
+
+/**
+ * getUpcomingFollowups(school_id, followupInterval, limit)
+ * SELECT upcoming follow-ups for leads (pre-admission stage)
+ * Returns leads ordered by: overdue → today → upcoming
+ * 
+ * @param {Number} school_id - School identifier (multi-tenant)
+ * @param {Number} followupInterval - Days interval for follow-up (defaults to 2 days)
+ * @param {Number} limit - Maximum records to return (defaults to 10)
+ * @returns {Array} Array of lead records with calculated next_follow_up_date
+ * 
+ * Business Logic:
+ * - Filters leads: follow_up_status IN ('pending', 'contacted', 'interested')
+ * - Requires: last_contacted_at IS NOT NULL
+ * - Calculates: next_follow_up_date = last_contacted_at + interval
+ * - Priority: Overdue (past) → Today → Upcoming (future)
+ */
+export const getUpcomingFollowups = async (school_id, followupInterval = 2, limit = 10) => {
+  const sql = `
+    SELECT 
+      l.id,
+      l.first_name,
+      l.last_name,
+      l.phone,
+      l.email,
+      l.follow_up_status,
+      l.last_contacted_at,
+      (l.last_contacted_at + INTERVAL '${followupInterval} days') AS next_follow_up_date,
+      l.assigned_to,
+      l.desired_class,
+      CASE 
+        WHEN (l.last_contacted_at + INTERVAL '${followupInterval} days') < NOW() THEN 'overdue'
+        WHEN DATE(l.last_contacted_at + INTERVAL '${followupInterval} days') = CURRENT_DATE THEN 'today'
+        ELSE 'upcoming'
+      END AS priority
+    FROM lead l
+    WHERE 
+      l.school_id = $1
+      AND l.follow_up_status IN ('pending', 'contacted', 'interested')
+      AND l.last_contacted_at IS NOT NULL
+    ORDER BY 
+      CASE 
+        WHEN (l.last_contacted_at + INTERVAL '${followupInterval} days') < NOW() THEN 1
+        WHEN DATE(l.last_contacted_at + INTERVAL '${followupInterval} days') = CURRENT_DATE THEN 2
+        ELSE 3
+      END,
+      (l.last_contacted_at + INTERVAL '${followupInterval} days') ASC
+    LIMIT $2;
+  `;
+  
+  const result = await pool.query(sql, [school_id, limit]);
+  return result.rows;
+};

@@ -182,3 +182,60 @@ export const deleteLead = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * getUpcomingFollowups(req, res, next)
+ * GET /api/leads/followups/upcoming
+ * Returns upcoming follow-ups for dashboard widget
+ * Query params: ?interval=2&limit=10
+ * 
+ * Response format:
+ * [
+ *   {
+ *     id,
+ *     first_name,
+ *     last_name,
+ *     phone,
+ *     email,
+ *     follow_up_status ('pending', 'contacted', 'interested'),
+ *     last_contacted_at,
+ *     next_follow_up_date (calculated),
+ *     assigned_to,
+ *     desired_class,
+ *     priority ('overdue', 'today', 'upcoming')
+ *   }
+ * ]
+ */
+export const getUpcomingFollowups = async (req, res, next) => {
+  try {
+    const school_id = req.user.school_id;
+    const interval = req.query.interval ? parseInt(req.query.interval) : 2;
+    const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+
+    // Validate query parameters
+    if (isNaN(interval) || interval < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid interval parameter. Must be a non-negative number."
+      });
+    }
+
+    if (isNaN(limit) || limit < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid limit parameter. Must be a positive number."
+      });
+    }
+
+    const followups = await leadQueries.getUpcomingFollowups(school_id, interval, limit);
+
+    res.status(200).json({
+      success: true,
+      data: followups,
+      count: followups.length
+    });
+  } catch (error) {
+    console.error('Lead Controller Error (getUpcomingFollowups):', error);
+    next(error);
+  }
+};

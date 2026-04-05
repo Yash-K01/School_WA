@@ -7,10 +7,10 @@ const dashboardService = {
   async getTotalInquiries(schoolId) {
     try {
       const { rows } = await pool.query(
-        'SELECT COUNT(*) AS total FROM lead WHERE school_id = $1',
-        [schoolId]
+        'SELECT COUNT(*) AS total FROM lead WHERE school_id = $1',[schoolId]
       );
       console.log('[Dashboard] getTotalInquiries:', rows[0].total);
+      // console.log(rows[0].total);
       return safeNumber(rows[0].total);
     } catch (err) {
       console.error('Error in getTotalInquiries:', err);

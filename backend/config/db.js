@@ -20,13 +20,18 @@ const pool = new Pool({
   min: parseInt(process.env.DB_POOL_MIN) || 2,
   max: parseInt(process.env.DB_POOL_MAX) || 10,
   idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000,
+  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 10000,
+  // Add query timeout
+  statement_timeout: 30000,
+  // Add SSL option for compatibility
+  ssl: false,
 });
 
 // Handle pool connection errors
 pool.on('error', (err, client) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error('⚠️ Unexpected error on idle client:', err.message);
+  // Don't exit immediately - allow the app to keep running
+  // process.exit(-1);
 });
 
 pool.on('connect', () => {
@@ -36,14 +41,24 @@ pool.on('connect', () => {
 // Test the connection when the application starts
 pool.query('SELECT NOW()', (err, result) => {
   if (err) {
-    console.error('❌ Database Connection Error:', err);
-    console.error('Please ensure PostgreSQL is running and credentials are correct.');
-    process.exit(1);
+    console.error('❌ Database Connection Error:', err.message);
+    console.error('\n📋 Connection Details:');
+    console.error('   Host:', process.env.DB_HOST || 'localhost');
+    console.error('   Port:', process.env.DB_PORT || 5432);
+    console.error('   User:', process.env.DB_USER || 'postgres');
+    console.error('   Database:', process.env.DB_NAME || 'postgres');
+    console.error('\n💡 Troubleshooting:');
+    console.error('   1. Ensure PostgreSQL is running: services.msc → postgresql-x64-17');
+    console.error('   2. Verify database exists: CREATE DATABASE school_erp;');
+    console.error('   3. Check credentials in .env file');
+    console.error('   4. Ensure user "postgres" has access to "school_erp" database');
+    console.error('\n');
+    // Don't exit - allow server to start and handle graceful reconnection
   } else {
-    console.log('✓ PostgreSQL Database Connected Successfully');
-    console.log('✓ Database:', process.env.DB_NAME);
-    console.log('✓ Host:', process.env.DB_HOST);
-    console.log('✓ Current Time (from DB):', result.rows[0].now);
+    console.log('✅ PostgreSQL Database Connected Successfully');
+    console.log('   Database:', process.env.DB_NAME);
+    console.log('   Host:', process.env.DB_HOST);
+    console.log('   Time from DB:', result.rows[0].now);
   }
 });
 

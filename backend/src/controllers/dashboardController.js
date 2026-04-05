@@ -32,7 +32,7 @@ export async function getDashboardStats(req, res) {
     const duration = Date.now() - start;
     console.log(`✅ [Dashboard] Stats fetched successfully in ${duration}ms`);
 
-    res.json({
+    const response = {
       totalInquiries,
       conversionRate,
       activeLeads,
@@ -40,7 +40,9 @@ export async function getDashboardStats(req, res) {
       pendingApplications,
       offersSent,
       feesCollected
-    });
+    };
+    console.log('📤 [Dashboard] Sending response to frontend:', response);
+    res.json(response);
   } catch (err) {
     console.error('❌ [Dashboard] stats error:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard stats', detail: err.message });

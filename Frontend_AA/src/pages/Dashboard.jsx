@@ -30,7 +30,12 @@ import {
   Cell,
 } from "recharts";
 import { useState, useEffect } from "react";
-import axios from "axios";
+import {
+  getDashboardStats,
+  getFunnelData,
+  checkBackendHealth,
+} from "../services/dashboardService";
+import UpcomingFollowups from "../components/UpcomingFollowups";
 import "../style.css";
 
 const statMeta = [
@@ -88,7 +93,7 @@ const statMeta = [
 ];
 
 const monthlyData = [
-  { month: "Aug", inquiries: 120, enrolled: 45 },
+  { month: "Aug", inquiries: 12, enrolled: 45 },
   { month: "Sep", inquiries: 145, enrolled: 52 },
   { month: "Oct", inquiries: 168, enrolled: 61 },
   { month: "Nov", inquiries: 192, enrolled: 68 },
@@ -157,25 +162,47 @@ export function Dashboard() {
   }));
 
   // Fetch funnel data from backend (must be inside component)
+  // Fetch funnel data from backend
   const fetchFunnelData = async (signal) => {
     try {
-      const { data } = await axios.get("/api/dashboard/funnel", { signal });
+      const data = await getFunnelData(signal);
       if (signal?.aborted) return;
+      console.log("📥 [Dashboard Frontend] Received funnel data:", data);
       const total = data.inquiry || 1;
       const funnelArr = [
         { stage: "Inquiry", count: data.inquiry, pct: "100%" },
-        { stage: "Contacted", count: data.contacted, pct: Math.round((data.contacted / total) * 100) + "%" },
-        { stage: "Interested", count: data.interested, pct: Math.round((data.interested / total) * 100) + "%" },
-        { stage: "Visit", count: data.visit, pct: Math.round((data.visit / total) * 100) + "%" },
-        { stage: "Applied", count: data.applied, pct: Math.round((data.applied / total) * 100) + "%" },
-        { stage: "Enrolled", count: data.enrolled, pct: Math.round((data.enrolled / total) * 100) + "%" },
+        {
+          stage: "Contacted",
+          count: data.contacted,
+          pct: Math.round((data.contacted / total) * 100) + "%",
+        },
+        {
+          stage: "Interested",
+          count: data.interested,
+          pct: Math.round((data.interested / total) * 100) + "%",
+        },
+        {
+          stage: "Visit",
+          count: data.visit,
+          pct: Math.round((data.visit / total) * 100) + "%",
+        },
+        {
+          stage: "Applied",
+          count: data.applied,
+          pct: Math.round((data.applied / total) * 100) + "%",
+        },
+        {
+          stage: "Enrolled",
+          count: data.enrolled,
+          pct: Math.round((data.enrolled / total) * 100) + "%",
+        },
       ];
+      console.log("📊 [Dashboard Frontend] Processed funnel array:", funnelArr);
       setFunnelData(funnelArr);
     } catch (err) {
       if (signal?.aborted) return;
-      const msg = err.response?.data?.error || err.message || "Failed to load funnel data";
-      const detail = err.response?.data?.detail ? ` (${err.response.data.detail})` : "";
-      setFunnelError(msg + detail);
+      console.error("❌ [Dashboard Frontend] Funnel error:", err);
+      setFunnelError(err.message || "Failed to load funnel data");
       setFunnelData([
         { stage: "Inquiry", count: 0, pct: "0%" },
         { stage: "Contacted", count: 0, pct: "0%" },
@@ -188,18 +215,19 @@ export function Dashboard() {
   };
 
   // Optionally, get schoolId from context/auth if needed
+  // Fetch dashboard stats from backend
   const fetchDashboardStats = async (signal) => {
     setLoading(true);
     setStatsError(null);
     try {
-      const { data } = await axios.get("/api/dashboard", { signal });
+      const data = await getDashboardStats(signal);
       if (signal?.aborted) return;
+      console.log("📥 [Dashboard Frontend] Received stats data:", data);
       setStatsData(data);
     } catch (err) {
       if (signal?.aborted) return;
-      const msg = err.response?.data?.error || err.message || "Failed to load stats";
-      const detail = err.response?.data?.detail ? ` (${err.response.data.detail})` : "";
-      setStatsError(msg + detail);
+      console.error("❌ [Dashboard Frontend] Stats error:", err);
+      setStatsError(err.message || "Failed to load stats");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -208,10 +236,11 @@ export function Dashboard() {
   const [backendStatus, setBackendStatus] = useState("unknown");
   const [backendError, setBackendError] = useState(null);
 
-  const checkBackendHealth = async (signal) => {
+  // Wrapper to call backend health check from service
+  const handleCheckBackendHealth = async (signal) => {
     try {
       setBackendStatus("checking");
-      await axios.get("/api/health", { signal });
+      await checkBackendHealth(signal);
       if (signal?.aborted) return;
       setBackendStatus("connected");
       setBackendError(null);
@@ -229,7 +258,7 @@ export function Dashboard() {
     setFunnelError(null);
     fetchDashboardStats(controller.signal);
     fetchFunnelData(controller.signal);
-    checkBackendHealth(controller.signal);
+    handleCheckBackendHealth(controller.signal);
     return () => {
       controller.abort();
     };
@@ -402,7 +431,9 @@ export function Dashboard() {
           >
             <span>Backend Connected</span>
             <button
-              onClick={checkBackendHealth}
+              onClick={() =>
+                handleCheckBackendHealth(new AbortController().signal)
+              }
               style={{
                 marginLeft: 8,
                 padding: "2px 6px",
@@ -433,7 +464,9 @@ export function Dashboard() {
           >
             ⚠️ {backendError}
             <button
-              onClick={checkBackendHealth}
+              onClick={() =>
+                handleCheckBackendHealth(new AbortController().signal)
+              }
               style={{
                 marginLeft: 12,
                 padding: "2px 8px",
@@ -611,92 +644,11 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Upcoming Follow-ups</div>
-              <div className="card-sub">Today's scheduled activities</div>
-            </div>
-          </div>
-          <div className="card-body">
-            {followUps.map((f, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "11px 0",
-                  borderBottom:
-                    i < followUps.length - 1 ? "1px solid var(--gray-100)" : "",
-                }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: f.avBg,
-                    color: f.avC,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    flexShrink: 0,
-                  }}
-                >
-                  {f.av}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "var(--gray-900)",
-                    }}
-                  >
-                    {f.name}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
-                    {f.sub}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    color: "var(--gray-400)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Clock size={12} />
-                  {f.time}
-                  <span className={`action-tag ${f.actionCls}`}>
-                    {f.action}
-                  </span>
-                </div>
-              </div>
-            ))}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--primary)",
-                marginTop: 10,
-                cursor: "pointer",
-              }}
-              onClick={() => navigate("/communication")}
-            >
-              View All <ArrowRight size={14} />
-            </div>
-          </div>
-        </div>
+        <UpcomingFollowups
+          interval={2}
+          limit={10}
+          onViewAll={() => navigate("/communication")}
+        />
       </div>
 
       {/* Monthly Trend + Grade Distribution */}

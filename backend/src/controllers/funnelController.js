@@ -8,7 +8,9 @@ export async function getFunnel(req, res) {
       console.warn('[Funnel] schoolId missing in request. Using default schoolId=1');
       schoolId = 1;
     }
+    console.log('📊 [Funnel API HIT] Fetching funnel for schoolId:', schoolId);
     const funnel = await getAdmissionFunnel(schoolId);
+    console.log('📊 [Funnel Data] Returning:', funnel);
     res.json(funnel);
   } catch (err) {
     console.error('[Funnel] Controller error:', err);

@@ -1,6 +1,7 @@
 import { getAuthHeader } from '../utils/authToken'
 
-const ADMISSIONS_API = 'http://localhost:5001/api/admissions'
+// Use relative path for Vite proxy compatibility
+const ADMISSIONS_API = '/api/admissions'
 
 /**
  * Get admission statistics (total, submitted, under_review, approved, waitlisted)
@@ -50,14 +51,13 @@ export async function getAdmissionStats() {
       waitlisted: 0
     }
   } catch (error) {
-    console.error('❌ getAdmissionStats error:', error.message)
-    console.error('   Stack:', error.stack)
+    console.error('getAdmissionStats error:', error)
     throw new Error(`Failed to fetch admission statistics: ${error.message}`)
   }
 }
 
 /**
- * Get paginated admissions list
+        console.log(`📊 Response status: ${response.status} ${response.statusText}`);
  * GET /api/admissions?limit={limit}&offset={offset}
  */
 export async function getAdmissions({ limit = 10, offset = 0 } = {}) {
@@ -79,7 +79,6 @@ export async function getAdmissions({ limit = 10, offset = 0 } = {}) {
     }
 
     const json = await response.json()
-
     if (!json.success) {
       throw new Error(json.message || 'Failed to fetch admissions')
     }

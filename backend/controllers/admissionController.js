@@ -6,6 +6,7 @@ import pool from '../config/db.js';
  * GET /api/admissions/stats
  */ 
 export const getAdmissionStats = async (req, res) => {
+  console.log('API HIT: /api/admissions/stats');
   try {
     const stats = await admissionService.getAdmissionStats();
     res.json({
@@ -27,18 +28,16 @@ export const getAdmissionStats = async (req, res) => {
  * GET /api/admissions/search?query=
  */
 export const searchAdmissions = async (req, res) => {
+  console.log('API HIT: /api/admissions/search');
   try {
     const { query } = req.query;
-
     if (!query || query.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'Query parameter is required'
       });
     }
-
     const results = await admissionService.searchAdmissions(query);
-    
     res.json({
       success: true,
       data: results,

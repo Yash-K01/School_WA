@@ -20,7 +20,8 @@ import {
   getAllLeads, 
   getLeadById, 
   updateLead, 
-  deleteLead 
+  deleteLead,
+  getUpcomingFollowups
 } from '../controllers/leadController.js';
 import { authMiddleware } from '../middleware/auth.js';
 
@@ -44,6 +45,15 @@ router.post('/', createLead);
  * Returns: 200 { success: true, data: [leadRow, ...] }
  */
 router.get('/', getAllLeads);
+
+/**
+ * GET /api/leads/followups/upcoming
+ * Get upcoming follow-ups for the Admissions Dashboard widget
+ * Query params: ?interval=2&limit=10
+ * Returns upcoming follow-ups ordered by priority (overdue → today → upcoming)
+ * Response: 200 { success: true, data: [followup, ...], count: number }
+ */
+router.get('/followups/upcoming', getUpcomingFollowups);
 
 /**
  * GET /api/leads/:id
