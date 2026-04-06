@@ -1,6 +1,6 @@
 import { getAuthHeader } from '../utils/authToken.js';
 
-const BASE_URL = 'http://localhost:5001/api/applications';
+const BASE_URL = '/api/applications';
 
 /**
  * Create a new application from a lead

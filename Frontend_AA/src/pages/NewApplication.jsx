@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  Save,
   CheckCircle,
   Upload,
   AlertTriangle,
@@ -76,16 +75,17 @@ const photoGroups = [
   },
 ];
 
-const fileSummary = [
-  "Student Photo",
-  "Father Photo",
-  "Mother Photo",
-  "Birth Certificate",
-  "Address Proof",
-  "Student Aadhar",
-  "Father Aadhar",
-  "Mother Aadhar",
-  "Previous Records",
+const REQUIRED_PHOTO_KEYS = [
+  "photo_Student_Student Photograph",
+  "photo_Student_Student Aadhar Card",
+  "photo_Father_Father's Photograph",
+  "photo_Mother_Mother's Photograph",
+];
+
+const REQUIRED_DOCUMENT_KEYS = [
+  "doc_BirthCertificate",
+  "doc_PreviousSchoolRecords",
+  "doc_AddressProof",
 ];
 
 export function NewApplication() {
@@ -94,7 +94,6 @@ export function NewApplication() {
   const stateData = location.state || {};
 
   const [step, setStep] = useState(0);
-  const [showBulk, setShowBulk] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState({});
@@ -127,6 +126,7 @@ export function NewApplication() {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const pct = Math.round((step / (STEPS.length - 1)) * 100);
+  const uploadedFileEntries = Object.entries(files).filter(([, file]) => Boolean(file));
 
   // Handle file selection for photos and documents
   const handleFileSelect = (category, name, file) => {
@@ -172,12 +172,13 @@ export function NewApplication() {
         return "Please fill all required academic and address fields";
     }
     if (s === 4) {
-      if (
-        !files.doc_BirthCertificate ||
-        !files.doc_PreviousSchoolRecords ||
-        !files.doc_AddressProof
-      )
+      if (!REQUIRED_DOCUMENT_KEYS.every((key) => files[key]))
         return "Please upload all required documents (Birth Certificate, Previous School Records, Address Proof)";
+    }
+    if (s === 3) {
+      if (!REQUIRED_PHOTO_KEYS.every((key) => files[key])) {
+        return "Please upload the required student and parent photos before continuing";
+      }
     }
     return "";
   };
@@ -257,7 +258,6 @@ export function NewApplication() {
       const response = await createAdmission(formData);
 
       if (response.success) {
-        // Show success and navigate
         alert("Application submitted successfully!");
         navigate("/applications", { state: { refresh: true } });
       } else {
@@ -833,9 +833,9 @@ export function NewApplication() {
   };
 
   return (
-    <div className="page-sm" style={{ maxWidth: 800 }}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
+    <div className="page-sm wizard-shell" style={{ maxWidth: 920 }}>
+      <div className="wizard-header mb-4">
+        <div className="wizard-header-main">
           <button
             className="back-btn"
             style={{ margin: 0 }}
@@ -847,7 +847,21 @@ export function NewApplication() {
             <h1 className="page-title" style={{ fontSize: 22 }}>
               New Application
             </h1>
-            <p className="page-sub">Complete all steps to submit</p>
+            <p className="page-sub">
+              Complete the student, parent, academic, and document sections in one flow.
+            </p>
+          </div>
+        </div>
+        <div className="wizard-header-meta">
+          <div className="wizard-meta-card">
+            <span className="wizard-meta-label">Step</span>
+            <strong>
+              {step + 1} / {STEPS.length}
+            </strong>
+          </div>
+          <div className="wizard-meta-card">
+            <span className="wizard-meta-label">Uploaded Files</span>
+            <strong>{uploadedFileEntries.length}</strong>
           </div>
         </div>
       </div>
@@ -890,7 +904,7 @@ export function NewApplication() {
       {renderStep()}
 
       {/* Nav */}
-      <div className="flex items-center justify-between mt-5">
+      <div className="wizard-actions mt-5">
         <button
           className="back-btn"
           style={{ margin: 0 }}
@@ -899,7 +913,7 @@ export function NewApplication() {
         >
           <ArrowLeft size={15} /> Previous
         </button>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           {step < STEPS.length - 1 ? (
             <button
               className="btn btn-primary btn-sm"
@@ -916,11 +930,11 @@ export function NewApplication() {
             >
               {loading ? (
                 <>
-                  <Loader size={13} className="animate-spin" /> Submitting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={13} /> Submit Application
+                <Loader size={13} className="animate-spin" /> Submitting...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={13} /> Submit Application
                 </>
               )}
             </button>

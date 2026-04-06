@@ -1,7 +1,11 @@
 import express from 'express';
 import * as admissionController from '../controllers/admissionController.js';
+import { authMiddleware } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
+
+router.use(authMiddleware);
 
 /**
  * GET /api/admissions/stats
@@ -13,7 +17,7 @@ router.get('/stats', admissionController.getAdmissionStats);
  * POST /api/admissions/create
  * Create a new admission
  */
-router.post('/create', admissionController.createAdmission);
+router.post('/create', upload.any(), admissionController.createAdmission);
 
 /**
  * GET /api/admissions/search?query=

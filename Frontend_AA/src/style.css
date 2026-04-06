@@ -476,6 +476,56 @@ input, select, textarea { font-family: var(--font); }
 .step-name { font-size: 11px; color: var(--gray-500); font-weight: 500; text-align: center; }
 .step-name.active { color: var(--primary); font-weight: 600; }
 
+.wizard-shell {
+  margin: 0 auto;
+}
+
+.wizard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.wizard-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wizard-header-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wizard-meta-card {
+  min-width: 120px;
+  padding: 12px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+.wizard-meta-label {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-bottom: 4px;
+}
+
+.wizard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 /* Upload box */
 .upload-box { border: 2px dashed var(--gray-300); border-radius: var(--r); padding: 20px; text-align: center; cursor: pointer; transition: var(--tr); width: 100%; }
 .upload-box:hover { border-color: var(--primary); background: var(--primary-light); }
@@ -621,6 +671,54 @@ input, select, textarea { font-family: var(--font); }
 .table { min-width: 100%; }
 .card-body { padding: 14px 20px 20px; }
 .btn { padding: 9px 18px; font-size: 14px; }
+
+@media (max-width: 900px) {
+  .grid-5,
+  .grid-4,
+  .grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-stats-7 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-5,
+  .grid-4,
+  .grid-3,
+  .grid-2,
+  .dashboard-stats-7,
+  .photo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-header-main {
+    width: 100%;
+  }
+
+  .wizard-header-meta {
+    width: 100%;
+  }
+
+  .wizard-meta-card {
+    flex: 1 1 140px;
+  }
+
+  .wizard-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wizard-actions > * {
+    width: 100%;
+  }
+
+  .step-item {
+    flex: 1 1 30%;
+  }
+}
 
 
 /* -- Loading Animation -- */

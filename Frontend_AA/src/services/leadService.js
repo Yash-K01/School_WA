@@ -6,7 +6,7 @@
 
 import { getAuthHeader } from '../utils/authToken.js';
 
-const API_BASE_URL = 'http://localhost:5001/api/leads';
+const API_BASE_URL = '/api/leads';
 
 /**
  * createLead(formData)

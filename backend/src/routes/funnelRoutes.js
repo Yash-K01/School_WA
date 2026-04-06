@@ -4,6 +4,6 @@ import authMiddleware from '../../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/dashboard/funnel', getFunnel);
+router.get('/dashboard/funnel', authMiddleware, getFunnel);
 
 export default router;

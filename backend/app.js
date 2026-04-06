@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Import database connection (to ensure connection is established)
 import pool from './config/db.js';
@@ -17,6 +19,9 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import funnelRoutes from './src/routes/funnelRoutes.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create Express app
 const app = express();
@@ -39,6 +44,7 @@ app.use(cors({
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.resolve(__dirname, process.env.UPLOAD_DIR || './uploads')));
 
 // Request logging middleware
 app.use((req, res, next) => {

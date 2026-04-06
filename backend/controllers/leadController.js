@@ -80,12 +80,14 @@ export const createLead = async (req, res, next) => {
 export const getAllLeads = async (req, res, next) => {
   try {
     const school_id = req.user.school_id;
-    const { follow_up_status, desired_class, assigned_to } = req.query;
+    const { follow_up_status, desired_class, assigned_to, search, limit } = req.query;
 
     const leads = await leadQueries.getAllLeads(school_id, {
       follow_up_status,
       desired_class,
-      assigned_to
+      assigned_to,
+      search,
+      limit: limit ? parseInt(limit, 10) : undefined
     });
 
     res.status(200).json({ 

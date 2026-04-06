@@ -146,6 +146,75 @@ const dashboardService = {
       throw err;
     }
   },
+
+  async getGradeDistribution(schoolId) {
+    try {
+      const query = `
+        SELECT
+          sc.class_name AS label,
+          COUNT(a.id)::integer AS value
+        FROM school_class sc
+        LEFT JOIN admission a
+          ON a.class_id = sc.id
+         AND a.school_id = sc.school_id
+         AND a.status IN ('active', 'submitted')
+        WHERE sc.school_id = $1
+        GROUP BY sc.id, sc.class_name, sc.class_numeric_value
+        HAVING COUNT(a.id) > 0
+        ORDER BY sc.class_numeric_value ASC, sc.class_name ASC;
+      `;
+      const { rows } = await pool.query(query, [schoolId]);
+      return rows;
+    } catch (err) {
+      console.error('Error in getGradeDistribution:', err);
+      throw err;
+    }
+  },
+
+  async getCounselorPerformance(schoolId) {
+    try {
+      const query = `
+        SELECT
+          u.id,
+          u.name,
+          COUNT(l.id)::integer AS leads,
+          COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN l.id END)::integer AS conversions,
+          COALESCE(
+            ROUND(
+              (
+                COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN l.id END)::numeric
+                / NULLIF(COUNT(l.id), 0)
+              ) * 100,
+              0
+            ),
+            0
+          )::integer AS pct
+        FROM app_user u
+        LEFT JOIN lead l
+          ON l.school_id = u.school_id
+         AND l.assigned_to IS NOT NULL
+         AND (
+           l.assigned_to::text = u.id::text
+           OR l.assigned_to::text = u.name
+         )
+        LEFT JOIN application a
+          ON a.school_id = l.school_id
+         AND a.lead_id = l.id
+        WHERE u.school_id = $1
+          AND u.status = 'active'
+          AND u.role IN ('counselor', 'admin')
+        GROUP BY u.id, u.name
+        HAVING COUNT(l.id) > 0
+        ORDER BY pct DESC, conversions DESC, leads DESC, u.name ASC
+        LIMIT 6;
+      `;
+      const { rows } = await pool.query(query, [schoolId]);
+      return rows;
+    } catch (err) {
+      console.error('Error in getCounselorPerformance:', err);
+      throw err;
+    }
+  },
 };
 
 export default dashboardService;

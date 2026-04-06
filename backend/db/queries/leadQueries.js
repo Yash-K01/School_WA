@@ -47,7 +47,7 @@ export const createLead = async (data) => {
  * @returns {Array} Array of lead records
  */
 export const getAllLeads = async (school_id, filters = {}) => {
-  const { follow_up_status, desired_class, assigned_to } = filters;
+  const { follow_up_status, desired_class, assigned_to, search, limit } = filters;
   
   let sql = 'SELECT * FROM lead WHERE school_id = $1';
   const params = [school_id];
@@ -64,8 +64,22 @@ export const getAllLeads = async (school_id, filters = {}) => {
     params.push(assigned_to);
     sql += ` AND assigned_to = $${params.length}`;
   }
+  if (search) {
+    params.push(`%${search}%`);
+    sql += ` AND (
+      first_name ILIKE $${params.length}
+      OR last_name ILIKE $${params.length}
+      OR CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) ILIKE $${params.length}
+      OR email ILIKE $${params.length}
+      OR phone ILIKE $${params.length}
+    )`;
+  }
 
   sql += ' ORDER BY created_at DESC';
+  if (Number.isInteger(limit) && limit > 0) {
+    params.push(limit);
+    sql += ` LIMIT $${params.length}`;
+  }
 
   const result = await pool.query(sql, params);
   return result.rows;
@@ -163,12 +177,12 @@ export const getUpcomingFollowups = async (school_id, followupInterval = 2, limi
       l.email,
       l.follow_up_status,
       l.last_contacted_at,
-      (l.last_contacted_at + INTERVAL '${followupInterval} days') AS next_follow_up_date,
+      (l.last_contacted_at + ($2 * INTERVAL '1 day')) AS next_follow_up_date,
       l.assigned_to,
       l.desired_class,
       CASE 
-        WHEN (l.last_contacted_at + INTERVAL '${followupInterval} days') < NOW() THEN 'overdue'
-        WHEN DATE(l.last_contacted_at + INTERVAL '${followupInterval} days') = CURRENT_DATE THEN 'today'
+        WHEN (l.last_contacted_at + ($2 * INTERVAL '1 day')) < NOW() THEN 'overdue'
+        WHEN DATE(l.last_contacted_at + ($2 * INTERVAL '1 day')) = CURRENT_DATE THEN 'today'
         ELSE 'upcoming'
       END AS priority
     FROM lead l
@@ -178,14 +192,14 @@ export const getUpcomingFollowups = async (school_id, followupInterval = 2, limi
       AND l.last_contacted_at IS NOT NULL
     ORDER BY 
       CASE 
-        WHEN (l.last_contacted_at + INTERVAL '${followupInterval} days') < NOW() THEN 1
-        WHEN DATE(l.last_contacted_at + INTERVAL '${followupInterval} days') = CURRENT_DATE THEN 2
+        WHEN (l.last_contacted_at + ($2 * INTERVAL '1 day')) < NOW() THEN 1
+        WHEN DATE(l.last_contacted_at + ($2 * INTERVAL '1 day')) = CURRENT_DATE THEN 2
         ELSE 3
       END,
-      (l.last_contacted_at + INTERVAL '${followupInterval} days') ASC
-    LIMIT $2;
+      (l.last_contacted_at + ($2 * INTERVAL '1 day')) ASC
+    LIMIT $3;
   `;
   
-  const result = await pool.query(sql, [school_id, limit]);
+  const result = await pool.query(sql, [school_id, followupInterval, limit]);
   return result.rows;
 };

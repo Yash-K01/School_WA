@@ -8,7 +8,7 @@ import pool from '../config/db.js';
 export const getAdmissionStats = async (req, res) => {
   console.log('API HIT: /api/admissions/stats');
   try {
-    const stats = await admissionService.getAdmissionStats();
+    const stats = await admissionService.getAdmissionStats(req.user.school_id);
     res.json({
       success: true,
       data: stats,
@@ -37,7 +37,7 @@ export const searchAdmissions = async (req, res) => {
         message: 'Query parameter is required'
       });
     }
-    const results = await admissionService.searchAdmissions(query);
+    const results = await admissionService.searchAdmissions(req.user.school_id, query);
     res.json({
       success: true,
       data: results,
@@ -69,7 +69,7 @@ export const getAllAdmissions = async (req, res) => {
       });
     }
 
-    const result = await admissionService.getAdmissions(limit, offset);
+    const result = await admissionService.getAdmissions(req.user.school_id, limit, offset);
     
     res.json({
       success: true,
@@ -105,7 +105,7 @@ export const getAdmissionById = async (req, res) => {
       });
     }
 
-    const admission = await admissionService.getAdmissionById(applicationId);
+    const admission = await admissionService.getAdmissionById(req.user.school_id, applicationId);
     
     res.json({
       success: true,
@@ -134,17 +134,29 @@ export const getAdmissionById = async (req, res) => {
  */
 export const createAdmission = async (req, res) => {
   try {
-    const { student, parent, admission } = req.body;
-    
-    // basic validation
-    if (!student || !parent || !admission) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required data: student, parent, or admission details'
-      });
-    }
+    const contentType = req.headers['content-type'] || '';
+    const isMultipart = contentType.includes('multipart/form-data');
 
-    const admission_id = await admissionService.createAdmission(student, parent, admission);
+    let admission_id;
+
+    if (isMultipart) {
+      admission_id = await admissionService.createAdmissionFromFormData(
+        req.user,
+        req.body,
+        req.files || []
+      );
+    } else {
+      const { student, parent, admission } = req.body;
+
+      if (!student || !parent || !admission) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required data: student, parent, or admission details'
+        });
+      }
+
+      admission_id = await admissionService.createAdmission(student, parent, admission);
+    }
     
     res.status(201).json({
       success: true,

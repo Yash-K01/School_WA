@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { getAuthHeader } from '../utils/authToken.js'
 
 /**
  * Hook to fetch and search leads
@@ -28,16 +29,10 @@ export function useLeads(searchQuery = '') {
           params.append('limit', '10') // Get 10 recent leads if no search
         }
 
-        const response = await fetch(
-          `http://localhost:5001/api/leads?${params.toString()}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${sessionStorage.getItem('auth_token') || ''}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        )
+        const response = await fetch(`/api/leads?${params.toString()}`, {
+          method: 'GET',
+          headers: getAuthHeader() || { 'Content-Type': 'application/json' }
+        })
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -91,7 +86,7 @@ export function useCreateAdmission() {
         headers['Content-Type'] = 'application/json'
       }
 
-      const response = await fetch('http://localhost:5001/api/admissions', {
+      const response = await fetch('/api/admissions', {
         method: 'POST',
         headers,
         body: isFormData ? payload : JSON.stringify(payload)

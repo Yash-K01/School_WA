@@ -34,6 +34,8 @@ import {
   getDashboardStats,
   getFunnelData,
   getMonthlyTrend,
+  getGradeDistribution,
+  getCounselorPerformance,
   checkBackendHealth,
 } from "../services/dashboardService";
 import UpcomingFollowups from "../components/UpcomingFollowups";
@@ -93,13 +95,15 @@ const statMeta = [
   },
 ];
 
-const gradeData = [
-  { label: "Grade 1", value: 45, color: "#22c55e" },
-  { label: "Grade 2", value: 38, color: "#3b82f6" },
-  { label: "Grade 3", value: 42, color: "#8b5cf6" },
-  { label: "Grade 4", value: 35, color: "#ec4899" },
-  { label: "Grade 5", value: 40, color: "#f59e0b" },
-  { label: "Grade 6", value: 34, color: "#14b8a6" },
+const chartColors = [
+  "#22c55e",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#f59e0b",
+  "#14b8a6",
+  "#ef4444",
+  "#6366f1",
 ];
 
 const Tip = ({ active, payload, label }) => {
@@ -138,6 +142,10 @@ export function Dashboard() {
   const [funnelError, setFunnelError] = useState(null);
   const [monthlyTrendData, setMonthlyTrendData] = useState([]);
   const [trendError, setTrendError] = useState(null);
+  const [gradeData, setGradeData] = useState([]);
+  const [gradeError, setGradeError] = useState(null);
+  const [counselors, setCounselors] = useState([]);
+  const [counselorError, setCounselorError] = useState(null);
 
   const stats = statMeta.map((m) => ({
     ...m,
@@ -241,6 +249,49 @@ export function Dashboard() {
     }
   };
 
+  const fetchGradeDistribution = async (signal) => {
+    try {
+      const resp = await getGradeDistribution(signal);
+      if (signal?.aborted) return;
+      if (resp?.success && Array.isArray(resp.data)) {
+        setGradeData(
+          resp.data.map((item, index) => ({
+            ...item,
+            color: chartColors[index % chartColors.length],
+          })),
+        );
+        setGradeError(null);
+      }
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error("Grade distribution error:", err);
+      setGradeError(err.message || "Failed to load grade distribution");
+      setGradeData([]);
+    }
+  };
+
+  const fetchCounselorPerformance = async (signal) => {
+    try {
+      const resp = await getCounselorPerformance(signal);
+      if (signal?.aborted) return;
+      if (resp?.success && Array.isArray(resp.data)) {
+        setCounselors(
+          resp.data.map((item, index) => ({
+            ...item,
+            conv: item.conversions ?? 0,
+            clr: chartColors[index % chartColors.length],
+          })),
+        );
+        setCounselorError(null);
+      }
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error("Counselor performance error:", err);
+      setCounselorError(err.message || "Failed to load counselor performance");
+      setCounselors([]);
+    }
+  };
+
   const [backendStatus, setBackendStatus] = useState("unknown");
   const [backendError, setBackendError] = useState(null);
 
@@ -265,57 +316,18 @@ export function Dashboard() {
     setStatsError(null);
     setFunnelError(null);
     setTrendError(null);
+    setGradeError(null);
+    setCounselorError(null);
     fetchDashboardStats(controller.signal);
     fetchFunnelData(controller.signal);
     fetchMonthlyTrend(controller.signal);
+    fetchGradeDistribution(controller.signal);
+    fetchCounselorPerformance(controller.signal);
     handleCheckBackendHealth(controller.signal);
     return () => {
       controller.abort();
     };
   }, []);
-
-  const followUps = [
-    {
-      name: "Rahul Sharma",
-      sub: "Class 1 Inquiry",
-      time: "10:30 AM",
-      av: "RS",
-      avBg: "#e0f2fe",
-      avC: "#0284c7",
-      action: "Call",
-      actionCls: "action-call",
-    },
-    {
-      name: "Sanya Malhotra",
-      sub: "Document Pending",
-      time: "11:45 AM",
-      av: "SM",
-      avBg: "#fef2f2",
-      avC: "#dc2626",
-      action: "Email",
-      actionCls: "action-email",
-    },
-    {
-      name: "Kevin Peter",
-      sub: "Campus Visit",
-      time: "02:15 PM",
-      av: "KP",
-      avBg: "#f3e8ff",
-      avC: "#7e22ce",
-      action: "Visit",
-      actionCls: "action-visit",
-    },
-    {
-      name: "Arya Singh",
-      sub: "Interview",
-      time: "04:30 PM",
-      av: "AS",
-      avBg: "#fef9c3",
-      avC: "#a16207",
-      action: "Inquiry",
-      actionCls: "action-interview",
-    },
-  ];
 
   const alerts = [
     {
@@ -332,11 +344,6 @@ export function Dashboard() {
     },
   ];
 
-  const counselors = [
-    { name: "Nisha Gupta", pct: 68, leads: 120, conv: 82, clr: "#14b8a6" },
-    { name: "Arjun Rao", pct: 54, leads: 95, conv: 51, clr: "#3b82f6" },
-    { name: "Priya Singh", pct: 42, leads: 88, conv: 37, clr: "#f59e0b" },
-  ];
 
   return (
     <div className="page">
@@ -747,24 +754,38 @@ export function Dashboard() {
               alignItems: "center",
             }}
           >
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart>
-                <Pie
-                  data={gradeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {gradeData.map((e, i) => (
-                    <Cell key={i} fill={e.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<Tip />} />
-              </PieChart>
-            </ResponsiveContainer>
+            {gradeData.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 0",
+                  color: "var(--gray-500)",
+                  fontSize: 13,
+                  width: "100%",
+                }}
+              >
+                {gradeError || "No grade distribution data available"}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={170}>
+                <PieChart>
+                  <Pie
+                    data={gradeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {gradeData.map((e, i) => (
+                      <Cell key={i} fill={e.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<Tip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
             <div
               style={{
                 display: "grid",
@@ -888,6 +909,18 @@ export function Dashboard() {
             </div>
           </div>
           <div className="card-body">
+            {counselors.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "24px 0",
+                  color: "var(--gray-500)",
+                  fontSize: 13,
+                }}
+              >
+                {counselorError || "No counselor performance data available"}
+              </div>
+            ) : null}
             {counselors.map((c, i) => (
               <div
                 key={i}

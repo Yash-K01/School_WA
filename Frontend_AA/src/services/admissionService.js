@@ -65,11 +65,12 @@ export async function getAdmissions({ limit = 10, offset = 0 } = {}) {
     const headers = getAuthHeader()
     if (!headers) throw new Error('Not authenticated')
 
-    const url = new URL(ADMISSIONS_API)
-    url.searchParams.append('limit', limit.toString())
-    url.searchParams.append('offset', offset.toString())
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString()
+    })
 
-    const response = await fetch(url.toString(), {
+    const response = await fetch(`${ADMISSIONS_API}?${params.toString()}`, {
       method: 'GET',
       headers
     })
@@ -103,10 +104,9 @@ export async function searchAdmissions(query) {
     const headers = getAuthHeader()
     if (!headers) throw new Error('Not authenticated')
 
-    const url = new URL(`${ADMISSIONS_API}/search`)
-    url.searchParams.append('query', query)
+    const params = new URLSearchParams({ query })
 
-    const response = await fetch(url.toString(), {
+    const response = await fetch(`${ADMISSIONS_API}/search?${params.toString()}`, {
       method: 'GET',
       headers
     })
@@ -166,7 +166,7 @@ export async function getAdmissionById(applicationId) {
 
 /**
  * Create new admission application
- * POST /api/admissions
+ * POST /api/admissions/create
  * Payload: { lead_id, student: {}, parents: [], academic: {}, documents: [], academic_year_id }
  */
 export async function createAdmission(payload) {
@@ -182,7 +182,7 @@ export async function createAdmission(payload) {
     const fetchHeaders = isFormData ? { ...headers } : headers
     delete fetchHeaders['Content-Type'] // Let browser set it for FormData
 
-    const response = await fetch(ADMISSIONS_API, {
+    const response = await fetch(`${ADMISSIONS_API}/create`, {
       method: 'POST',
       headers: fetchHeaders,
       body: isFormData ? payload : JSON.stringify(payload)
@@ -199,7 +199,12 @@ export async function createAdmission(payload) {
       throw new Error(json.message || 'Failed to create application')
     }
 
-    return json.data
+    return {
+      success: true,
+      data: json.data,
+      admission_id: json.admission_id,
+      message: json.message
+    }
   } catch (error) {
     console.error('createAdmission error:', error)
     throw new Error(`Failed to create application: ${error.message}`)
