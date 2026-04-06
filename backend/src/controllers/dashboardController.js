@@ -48,3 +48,27 @@ export async function getDashboardStats(req, res) {
     res.status(500).json({ error: 'Failed to fetch dashboard stats', detail: err.message });
   }
 }
+
+export async function getMonthlyTrend(req, res) {
+  try {
+    const start = Date.now();
+    let schoolId = req.user?.school_id || req.query.schoolId || req.body.schoolId;
+    if (!schoolId) {
+      schoolId = 1;
+    }
+    console.log(`🚀 [Dashboard] Fetching monthly trend for schoolId: ${schoolId}...`);
+
+    const data = await dashboardService.getMonthlyTrend(schoolId);
+
+    const duration = Date.now() - start;
+    console.log(`✅ [Dashboard] Monthly trend fetched successfully in ${duration}ms`);
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (err) {
+    console.error('❌ [Dashboard] monthly trend error:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch monthly trend', detail: err.message });
+  }
+}

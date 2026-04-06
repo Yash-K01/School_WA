@@ -33,6 +33,7 @@ import { useState, useEffect } from "react";
 import {
   getDashboardStats,
   getFunnelData,
+  getMonthlyTrend,
   checkBackendHealth,
 } from "../services/dashboardService";
 import UpcomingFollowups from "../components/UpcomingFollowups";
@@ -92,16 +93,6 @@ const statMeta = [
   },
 ];
 
-const monthlyData = [
-  { month: "Aug", inquiries: 12, enrolled: 45 },
-  { month: "Sep", inquiries: 145, enrolled: 52 },
-  { month: "Oct", inquiries: 168, enrolled: 61 },
-  { month: "Nov", inquiries: 192, enrolled: 68 },
-  { month: "Dec", inquiries: 215, enrolled: 75 },
-  { month: "Jan", inquiries: 234, enrolled: 82 },
-  { month: "Feb", inquiries: 256, enrolled: 89 },
-];
-
 const gradeData = [
   { label: "Grade 1", value: 45, color: "#22c55e" },
   { label: "Grade 2", value: 38, color: "#3b82f6" },
@@ -145,6 +136,8 @@ export function Dashboard() {
   const [statsError, setStatsError] = useState(null);
   const [funnelData, setFunnelData] = useState([]);
   const [funnelError, setFunnelError] = useState(null);
+  const [monthlyTrendData, setMonthlyTrendData] = useState([]);
+  const [trendError, setTrendError] = useState(null);
 
   const stats = statMeta.map((m) => ({
     ...m,
@@ -233,6 +226,21 @@ export function Dashboard() {
     }
   };
 
+  const fetchMonthlyTrend = async (signal) => {
+    try {
+      const resp = await getMonthlyTrend(signal);
+      if (signal?.aborted) return;
+      if (resp?.success && Array.isArray(resp.data)) {
+        setMonthlyTrendData(resp.data);
+      }
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error("❌ [Dashboard Frontend] Trend error:", err);
+      setTrendError(err.message || "Failed to load monthly trend");
+      setMonthlyTrendData([]);
+    }
+  };
+
   const [backendStatus, setBackendStatus] = useState("unknown");
   const [backendError, setBackendError] = useState(null);
 
@@ -256,8 +264,10 @@ export function Dashboard() {
     const controller = new AbortController();
     setStatsError(null);
     setFunnelError(null);
+    setTrendError(null);
     fetchDashboardStats(controller.signal);
     fetchFunnelData(controller.signal);
+    fetchMonthlyTrend(controller.signal);
     handleCheckBackendHealth(controller.signal);
     return () => {
       controller.abort();
@@ -380,6 +390,25 @@ export function Dashboard() {
               ⚠️ {funnelError}
               <button
                 onClick={() => fetchFunnelData()}
+                style={{
+                  marginLeft: 12,
+                  padding: "2px 8px",
+                  fontSize: 12,
+                  border: "1px solid #991b1b",
+                  borderRadius: 4,
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {trendError && (
+            <div>
+              ⚠️ {trendError}
+              <button
+                onClick={() => fetchMonthlyTrend()}
                 style={{
                   marginLeft: 12,
                   padding: "2px 8px",
@@ -661,39 +690,45 @@ export function Dashboard() {
             </div>
           </div>
           <div className="card-body">
-            <ResponsiveContainer width="100%" height={210}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<Tip />} />
-                <Line
-                  type="monotone"
-                  dataKey="inquiries"
-                  stroke="#3b82f6"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: "#3b82f6" }}
-                  name="inquiries"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="enrolled"
-                  stroke="#14b8a6"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: "#14b8a6" }}
-                  name="enrolled"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {monthlyTrendData.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--gray-500)", fontSize: 13 }}>
+                No trend data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={210}>
+                <LineChart data={monthlyTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#9ca3af", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#9ca3af", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<Tip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="inquiries"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "#3b82f6" }}
+                    name="inquiries"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="enrollments"
+                    stroke="#14b8a6"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "#14b8a6" }}
+                    name="enrollments"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

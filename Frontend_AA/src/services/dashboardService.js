@@ -20,6 +20,15 @@ export async function getFunnelData(signal) {
 }
 
 /**
+ * Fetch monthly trend for inquiries and enrollments
+ * GET /api/dashboard/monthly-trend
+ */
+export async function getMonthlyTrend(signal) {
+  const { data } = await axios.get('/api/dashboard/monthly-trend', { signal });
+  return data;
+}
+
+/**
  * Check backend health status
  * GET /api/health
  */

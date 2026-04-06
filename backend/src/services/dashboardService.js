@@ -105,6 +105,47 @@ const dashboardService = {
       throw err;
     }
   },
+
+  async getMonthlyTrend(schoolId) {
+    try {
+      const query = `
+        WITH months AS (
+          SELECT 
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months' + 
+            (INTERVAL '1 month' * generate_series(0,5)) AS month_start
+        )
+        SELECT 
+          TO_CHAR(m.month_start, 'Mon') AS month,
+          COALESCE(l.inquiries, 0)::integer AS inquiries,
+          COALESCE(a.enrollments, 0)::integer AS enrollments
+        FROM months m
+        LEFT JOIN (
+          SELECT 
+            DATE_TRUNC('month', created_at) AS month,
+            COUNT(*) AS inquiries
+          FROM lead
+          WHERE school_id = $1
+          GROUP BY month
+        ) l ON l.month = m.month_start
+        LEFT JOIN (
+          SELECT 
+            DATE_TRUNC('month', admission_date) AS month,
+            COUNT(*) AS enrollments
+          FROM admission
+          WHERE school_id = $1
+            AND status = 'active'
+          GROUP BY month
+        ) a ON a.month = m.month_start
+        ORDER BY m.month_start;
+      `;
+      const { rows } = await pool.query(query, [schoolId]);
+      console.log('[Dashboard] getMonthlyTrend:', rows.length, 'months fetched');
+      return rows;
+    } catch (err) {
+      console.error('Error in getMonthlyTrend:', err);
+      throw err;
+    }
+  },
 };
 
 export default dashboardService;
