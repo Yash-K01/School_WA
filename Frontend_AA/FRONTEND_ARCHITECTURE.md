@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Generated: 2026-03-31
+Generated: 2026-04-12
 
 This document describes the React frontend (Vite) in `Frontend_AA/` and is intended to onboard developers quickly: folder layout, module breakdown, component hierarchy, data flow, props, routing, API integration, state usage, and common issues.
 
@@ -28,51 +28,65 @@ Frontend_AA/
 ├── index.html
 ├── package.json
 ├── vite.config.js
+├── eslint.config.js
 ├── src/
 │   ├── App.jsx
 │   ├── main.jsx
 │   ├── style.css
-│   ├── index.css
 │   ├── assets/
 │   ├── components/
-│   │   ├── Layout.jsx           # App shell, header, sidebar, and <Outlet />
-│   │   └── HealthCheck.jsx      # small health/status component
-│   ├── pages/                   # page-level views (route targets)
-│   │   ├── Dashboard.jsx
-│   │   ├── Leads.jsx
-│   │   ├── AddLead.jsx
-│   │   ├── Applications.jsx
-│   │   ├── CreateApplication.jsx
-│   │   ├── NewApplication.jsx
-│   │   ├── Pipeline.jsx
-│   │   ├── Communication.jsx
-│   │   ├── Counseling.jsx
-│   │   ├── ScheduleVisit.jsx
-│   │   ├── Screening.jsx
-│   │   ├── OffersSeats.jsx
-│   │   ├── FeesPayments.jsx
-│   │   ├── Enrollment.jsx
-│   │   ├── Reports.jsx
-│   │   ├── Security.jsx
-│   │   ├── Settings.jsx
-│   │   └── Login.jsx
-│   ├── services/                # API clients
-│   │   └── leadService.js       # lead-related calls
+│   │   ├── ApplicationsTable.jsx    # Table component for applications list
+│   │   ├── HealthCheck.jsx          # Health status component
+│   │   ├── Layout.jsx               # App shell, header, sidebar, and <Outlet />
+│   │   ├── StatsCard.jsx            # Reusable stats card component
+│   │   └── UpcomingFollowups.jsx    # Upcoming follow-ups widget
+│   ├── hooks/
+│   │   ├── useAdmissions.js         # Custom hook for admissions data
+│   │   ├── useApplication.js        # Custom hook for application management
+│   │   ├── useLeads.js              # Custom hook for leads data
+│   │   └── useUpcomingFollowups.js  # Custom hook for follow-ups
+│   ├── pages/                       # page-level views (route targets)
+│   │   ├── AddLead.jsx              # Add new lead form
+│   │   ├── Applications.jsx         # Applications list and management
+│   │   ├── Communication.jsx        # Communication tools
+│   │   ├── Counseling.jsx           # Counseling dashboard
+│   │   ├── CreateApplication.jsx    # Create application form
+│   │   ├── Dashboard.jsx            # Main dashboard with stats and widgets
+│   │   ├── Enrollment.jsx           # Enrollment management
+│   │   ├── FeesPayments.jsx         # Fees and payments
+│   │   ├── Leads.jsx                # Leads list and management
+│   │   ├── Login.jsx                # Authentication page
+│   │   ├── MultiStepApplication.jsx # Multi-step application form
+│   │   ├── NewApplication.jsx       # New application page
+│   │   ├── OffersSeats.jsx          # Offers and seats management
+│   │   ├── ParentForm.jsx           # Parent information form
+│   │   ├── Pipeline.jsx             # Sales pipeline view
+│   │   ├── Reports.jsx              # Reports and analytics
+│   │   ├── ScheduleVisit.jsx        # Schedule visit page
+│   │   ├── Screening.jsx            # Application screening
+│   │   ├── Security.jsx             # Security settings
+│   │   └── Settings.jsx             # Application settings
+│   ├── services/                    # API clients
+│   │   ├── admissionService.js      # Admission-related API calls
+│   │   ├── applicationService.js    # Application management API calls
+│   │   ├── dashboardService.js      # Dashboard stats and data API calls
+│   │   └── leadService.js           # Lead-related API calls
 │   └── utils/
-│       └── authToken.js         # token helpers, isAuthenticated()
+│       └── authToken.js             # Token helpers, isAuthenticated()
 └── README.md
 ```
 
 Folder purposes
 
 - `src/pages/` - Route targets. Each file is a full page view. Keep page-specific logic here.
-- `src/components/` - Shared, presentational components used across pages (Layout, HealthCheck, small widgets).
+- `src/components/` - Shared, presentational components used across pages (Layout, HealthCheck, StatsCard, UpcomingFollowups, ApplicationsTable).
+- `src/hooks/` - Custom React hooks for data fetching and state management (useAdmissions, useApplication, useLeads, useUpcomingFollowups).
 - `src/services/` - API client functions that encapsulate fetch calls and request/response shape.
-- `src/utils/` - small helpers (auth token management, formatting, etc.).
-- `src/assets/` - images and static assets.
+- `src/utils/` - Small helpers (auth token management, formatting, etc.).
+- `src/assets/` - Images and static assets.
 - `App.jsx` - Central router and protected-route wrapper.
 
-Notes: the current app does not yet use a `modules/` folder but pages are organized by feature; migrating to `src/modules/{feature}/{pages,components,services}` is recommended for larger scale.
+Notes: The app uses feature-based organization with dedicated hooks and services for each domain (leads, applications, admissions, dashboard). Components are shared across pages, and custom hooks handle data fetching with error states and loading indicators.
 
 ---
 
@@ -95,9 +109,15 @@ Protected shell (requires `isAuthenticated()`)
 - `/counseling/schedule-visit` → `ScheduleVisit.jsx`
 - `/applications` → `Applications.jsx`
 - `/applications/create` → `CreateApplication.jsx`
+- `/applications/form/:id` → `MultiStepApplication.jsx` (dynamic route for multi-step form)
 - `/applications/new` → `NewApplication.jsx`
 - `/screening` → `Screening.jsx`
 - `/offers-seats` → `OffersSeats.jsx`
+- `/fees-payments` → `FeesPayments.jsx`
+- `/enrollment` → `Enrollment.jsx`
+- `/reports` → `Reports.jsx`
+- `/security` → `Security.jsx`
+- `/settings` → `Settings.jsx`
 - `/fees-payments` → `FeesPayments.jsx`
 - `/enrollment` → `Enrollment.jsx`
 - `/reports` → `Reports.jsx`
@@ -246,40 +266,91 @@ Auth header provider (in `src/utils/authToken.js`)
 
 ---
 
-## Section 6 — API integration (observed)
+## Section 6 — API integration
 
-Service: `src/services/leadService.js` — base URL `http://localhost:5001/api/leads`
+The frontend uses multiple service files for API integration, each handling a specific domain:
 
-Key endpoints (frontend expectations)
+### `src/services/leadService.js` — Base URL `http://localhost:5001/api/leads`
 
-- POST `/api/leads`
-  - Request: JSON body with fields: `school_id` (in backend set from auth), `academic_year_id`, `first_name`, `last_name`, `email`, `phone`, `desired_class`, `source`, `follow_up_status`, `notes`, `assigned_to`, `follow_up_date`
-  - Response: `{ success: true, data: { ...lead }, message }`
+Key endpoints:
 
-- GET `/api/leads` (supports query params)
-  - Query: `follow_up_status`, `desired_class`, `assigned_to`
-  - Response: `{ success: true, data: [ lead ] }`
+- POST `/api/leads` - Create new lead
+  - Request: JSON body with lead fields
+  - Response: `{ success: true, data: lead, message }`
 
-- GET `/api/leads/:id`
+- GET `/api/leads` - Get all leads (with optional filters)
+  - Query params: `follow_up_status`, `desired_class`, `assigned_to`
+  - Response: `{ success: true, data: [leads] }`
+
+- GET `/api/leads/:id` - Get lead by ID
   - Response: `{ success: true, data: lead }`
 
-- PUT `/api/leads/:id`
-  - Request: Partial lead object to update
+- PUT `/api/leads/:id` - Update lead
+  - Request: Partial lead object
   - Response: `{ success: true, data: updatedLead }`
 
-- DELETE `/api/leads/:id`
+- DELETE `/api/leads/:id` - Delete lead
   - Response: `204` on success
 
-Additional APIs (recommended / expected for Applications module)
+- GET `/api/leads/followups/upcoming` - Get upcoming follow-ups
+  - Query params: `interval` (days), `limit`
+  - Response: `{ success: true, data: [followups], count }`
 
-- GET `/api/admissions/stats` — returns counts
-  - Response example: `{ success: true, data: { total: 12, submitted: 4, underReview: 3, approved: 3, waitlisted: 2 } }`
+### `src/services/dashboardService.js` — Base URL `http://localhost:5001/api/dashboard`
 
-- POST `/api/admissions` — create application (full form)
-  - Request: application payload (see Section 3)
-  - Response: `{ success: true, data: { application_id, ... } }
+Dashboard statistics and data:
 
-Notes: Standardize all service responses to `{ success: boolean, data: any, message?: string }` and handle `response.ok` in services.
+- GET `/api/dashboard` - Get dashboard stats
+  - Response: `{ success: true, data: { totalInquiries, conversionRate, activeLeads, ... } }`
+
+- GET `/api/dashboard/funnel` - Get admission funnel data
+  - Response: `{ success: true, data: { inquiry, contacted, interested, visit, applied, enrolled } }`
+
+- GET `/api/dashboard/monthly-trend` - Get monthly trends
+  - Response: `{ success: true, data: [{ month, inquiries, enrollments }] }`
+
+- GET `/api/dashboard/grade-distribution` - Get grade distribution
+  - Response: `{ success: true, data: [{ label, value }] }`
+
+- GET `/api/dashboard/counselor-performance` - Get counselor performance
+  - Response: `{ success: true, data: [{ name, leads, conversions, pct }] }`
+
+- GET `/api/health` - Health check
+  - Response: `{ success: true, message, timestamp, environment }`
+
+### `src/services/applicationService.js` — Base URL `http://localhost:5001/api/applications`
+
+Application management:
+
+- POST `/api/applications` - Create new application
+  - Request: `{ lead_id, academic_year_id }`
+  - Response: `{ success: true, data: application }`
+
+- GET `/api/applications` - Get all applications
+  - Response: `{ success: true, data: [applications] }`
+
+- GET `/api/applications/:id` - Get application by ID
+  - Response: `{ success: true, data: application }`
+
+### `src/services/admissionService.js` — Base URL `http://localhost:5001/api/admissions`
+
+Admission processing:
+
+- GET `/api/admissions/stats` - Get admission statistics
+  - Response: `{ success: true, data: { total, submitted, under_review, approved, waitlisted } }`
+
+- GET `/api/admissions/search` - Search admissions
+  - Query: `query` (name or phone)
+  - Response: `{ success: true, data: [admissions] }`
+
+- GET `/api/admissions` - Get all admissions (paginated)
+  - Query: `limit`, `offset`
+  - Response: `{ success: true, data: [admissions], pagination }`
+
+- GET `/api/admissions/:id` - Get admission details
+  - Response: `{ success: true, data: admission }`
+
+Notes: All services use JWT authentication via `Authorization: Bearer <token>` header and standardize responses to `{ success: boolean, data: any, message?: string }`.
 
 ---
 

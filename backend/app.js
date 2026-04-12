@@ -17,6 +17,12 @@ import applicationRoutes from './routes/applicationRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import funnelRoutes from './src/routes/funnelRoutes.js';
+import communicationRoutes from './routes/communicationRoutes.js';
+import emailRoutes from './routes/email.routes.js';
+import templateRoutes from './routes/templateRoutes.js';
+import smsRoutes from './routes/sms.routes.js';
+import whatsappRoutes from './routes/whatsapp.routes.js';
+import campaignV2Routes from './routes/campaign.routes.js';
 
 dotenv.config();
 
@@ -108,6 +114,24 @@ app.use('/api/applications', applicationRoutes);
 // Parent routes
 app.use('/api/parents', parentRoutes);
 
+// Communication routes
+app.use('/api/communication', communicationRoutes);
+
+// Email routes
+app.use('/api/email', emailRoutes);
+
+// Template routes
+app.use('/api/templates', templateRoutes);
+
+// SMS routes
+app.use('/api/sms', smsRoutes);
+
+// WhatsApp routes
+app.use('/api/whatsapp', whatsappRoutes);
+
+// Campaign routes (v2 strict module)
+app.use('/api/campaigns', campaignV2Routes);
+
 // Dashboard routes
 app.use('/api', dashboardRoutes);
 
@@ -137,9 +161,10 @@ app.use((error, req, res, next) => {
     stack: error.stack,
   });
 
-  res.status(error.status || 500).json({
+  res.status(error.statusCode || error.status || 500).json({
     success: false,
     message: error.message || 'Internal Server Error',
+    ...(error.details && { details: error.details }),
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
   });
 });

@@ -1,4 +1,3 @@
--- hashing :- bcryptjs 
 -- ============================================================================
 -- School Admission CRM System - PostgreSQL Schema
 -- ============================================================================
@@ -64,7 +63,6 @@ CREATE TABLE academic_year (
 );
 CREATE INDEX idx_academic_year_school_id ON academic_year(school_id);
 CREATE INDEX idx_academic_year_is_active ON academic_year(is_active);
--- ...existing code...
 -- ============================================================================
 -- TABLE 3: SCHOOL_CLASS
 -- ============================================================================
@@ -1068,6 +1066,643 @@ UPDATE ON lead_activity FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 -- Apply to app_user
 CREATE TRIGGER tr_app_user_updated_at BEFORE
 UPDATE ON app_user FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+-- ==========================
+-- communication log
+-- ==========================
+CREATE TABLE communication_log (
+  id BIGSERIAL PRIMARY KEY,
+  school_id BIGINT REFERENCES school(id) ON DELETE CASCADE,
+  recipient_type VARCHAR(50) CHECK (recipient_type IN ('lead', 'student', 'parent')),
+  recipient_id BIGINT,
+  channel VARCHAR(20) CHECK (channel IN ('email', 'sms', 'whatsapp')),
+  subject VARCHAR(255),
+  message TEXT,
+  status VARCHAR(50) CHECK (
+    status IN (
+      'sent',
+      'delivered',
+      'failed',
+      'opened',
+      'clicked'
+    )
+  ),
+  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  delivered_at TIMESTAMP,
+  opened_at TIMESTAMP,
+  clicked_at TIMESTAMP,
+  created_by BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE message_template (
+  id BIGSERIAL PRIMARY KEY,
+  school_id BIGINT REFERENCES school(id),
+  name VARCHAR(100),
+  category VARCHAR(50),
+  -- onboarding, follow-up, reminder
+  subject VARCHAR(255),
+  content TEXT,
+  last_used_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE campaign (
+  id BIGSERIAL PRIMARY KEY,
+  school_id BIGINT REFERENCES school(id),
+  name VARCHAR(100),
+  channel VARCHAR(20),
+  status VARCHAR(50),
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- sample data for communications table 
+-- communication_log data
+INSERT INTO communication_log (
+    school_id,
+    recipient_type,
+    recipient_id,
+    channel,
+    subject,
+    message,
+    status,
+    sent_at,
+    delivered_at,
+    opened_at,
+    clicked_at,
+    created_by
+  )
+VALUES (
+    1,
+    'lead',
+    1,
+    'email',
+    'Welcome',
+    'Welcome to our school',
+    'delivered',
+    NOW(),
+    NOW(),
+    NOW(),
+    NULL,
+    1
+  ),
+  (
+    1,
+    'lead',
+    2,
+    'sms',
+    NULL,
+    'Visit scheduled',
+    'sent',
+    NOW(),
+    NULL,
+    NULL,
+    NULL,
+    1
+  ),
+  (
+    1,
+    'student',
+    1,
+    'whatsapp',
+    NULL,
+    'Fee reminder',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    1
+  ),
+  (
+    1,
+    'parent',
+    1,
+    'email',
+    'PTM Meeting',
+    'Join PTM tomorrow',
+    'opened',
+    NOW(),
+    NOW(),
+    NOW(),
+    NULL,
+    1
+  ),
+  (
+    1,
+    'lead',
+    3,
+    'email',
+    'Admission Open',
+    'Apply now',
+    'clicked',
+    NOW(),
+    NOW(),
+    NOW(),
+    NOW(),
+    1
+  ),
+  (
+    1,
+    'student',
+    2,
+    'sms',
+    NULL,
+    'Exam schedule',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    2
+  ),
+  (
+    1,
+    'parent',
+    2,
+    'whatsapp',
+    NULL,
+    'Fee due',
+    'sent',
+    NOW(),
+    NULL,
+    NULL,
+    NULL,
+    2
+  ),
+  (
+    1,
+    'lead',
+    4,
+    'email',
+    'Follow-up',
+    'Checking interest',
+    'opened',
+    NOW(),
+    NOW(),
+    NOW(),
+    NULL,
+    2
+  ),
+  (
+    1,
+    'student',
+    3,
+    'email',
+    'Holiday Notice',
+    'School closed tomorrow',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    2
+  ),
+  (
+    1,
+    'parent',
+    3,
+    'sms',
+    NULL,
+    'Transport update',
+    'sent',
+    NOW(),
+    NULL,
+    NULL,
+    NULL,
+    2
+  ),
+  (
+    1,
+    'lead',
+    5,
+    'email',
+    'Campus Visit',
+    'Schedule visit',
+    'clicked',
+    NOW(),
+    NOW(),
+    NOW(),
+    NOW(),
+    1
+  ),
+  (
+    1,
+    'student',
+    4,
+    'whatsapp',
+    NULL,
+    'Assignment reminder',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    1
+  ),
+  (
+    1,
+    'parent',
+    4,
+    'email',
+    'Result Published',
+    'Check portal',
+    'opened',
+    NOW(),
+    NOW(),
+    NOW(),
+    NULL,
+    1
+  ),
+  (
+    1,
+    'lead',
+    6,
+    'sms',
+    NULL,
+    'Application pending',
+    'sent',
+    NOW(),
+    NULL,
+    NULL,
+    NULL,
+    1
+  ),
+  (
+    1,
+    'student',
+    5,
+    'email',
+    'Fee Receipt',
+    'Download receipt',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    1
+  ),
+  (
+    1,
+    'lead',
+    7,
+    'email',
+    'Reminder',
+    'Complete application',
+    'opened',
+    NOW(),
+    NOW(),
+    NOW(),
+    NULL,
+    2
+  ),
+  (
+    1,
+    'student',
+    6,
+    'sms',
+    NULL,
+    'Attendance alert',
+    'sent',
+    NOW(),
+    NULL,
+    NULL,
+    NULL,
+    2
+  ),
+  (
+    1,
+    'parent',
+    6,
+    'email',
+    'Meeting Reminder',
+    'PTM reminder',
+    'delivered',
+    NOW(),
+    NOW(),
+    NULL,
+    NULL,
+    2
+  );
+-- message_template sample data
+INSERT INTO message_template (
+    school_id,
+    name,
+    category,
+    subject,
+    content,
+    last_used_at
+  )
+VALUES (
+    1,
+    'Welcome Email',
+    'onboarding',
+    'Welcome to School',
+    'Welcome {{name}} to our school',
+    NOW()
+  ),
+  (
+    1,
+    'Fee Reminder',
+    'reminder',
+    'Fee Due',
+    'Your fee is pending',
+    NOW()
+  ),
+  (
+    1,
+    'Campus Visit',
+    'follow-up',
+    'Visit Invitation',
+    'Schedule your visit',
+    NOW()
+  ),
+  (
+    1,
+    'Application Reminder',
+    'reminder',
+    'Complete Application',
+    'Finish your form',
+    NOW()
+  ),
+  (
+    1,
+    'Event Invite',
+    'information',
+    'Annual Day',
+    'Join our event',
+    NOW()
+  );
+-- campaign sample 
+INSERT INTO campaign (
+    school_id,
+    name,
+    channel,
+    status,
+    start_date,
+    end_date
+  )
+VALUES (
+    1,
+    'Admission Campaign 2026',
+    'email',
+    'active',
+    '2026-01-01',
+    '2026-03-31'
+  ),
+  (
+    1,
+    'Fee Reminder Campaign',
+    'sms',
+    'active',
+    '2026-02-01',
+    '2026-02-28'
+  ),
+  (
+    1,
+    'Campus Visit Drive',
+    'whatsapp',
+    'completed',
+    '2025-12-01',
+    '2025-12-31'
+  ),
+  (
+    1,
+    'Re-engagement Campaign',
+    'email',
+    'draft',
+    '2026-04-01',
+    '2026-04-30'
+  ),
+  (
+    1,
+    'New Session Outreach',
+    'sms',
+    'active',
+    '2026-03-01',
+    '2026-05-01'
+  );
+-- ============================================================================
+-- APPLICATION MULTI-STEP FORM SCHEMA
+-- ============================================================================
+-- Tracks application progress through multi-step form system
+-- Create application main table
+CREATE TABLE IF NOT EXISTS application (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+  lead_id BIGINT REFERENCES lead(id) ON DELETE
+  SET NULL,
+    student_id BIGINT REFERENCES student(id) ON DELETE
+  SET NULL,
+    academic_year_id BIGINT NOT NULL REFERENCES academic_year(id) ON DELETE CASCADE,
+    -- Step tracking
+    current_step INT DEFAULT 1 CHECK (
+      current_step >= 1
+      AND current_step <= 6
+    ),
+    status VARCHAR(50) DEFAULT 'in_progress' CHECK (
+      status IN (
+        'in_progress',
+        'submitted',
+        'approved',
+        'rejected',
+        'on_hold'
+      )
+    ),
+    -- Auto-fill fields
+    admission_type VARCHAR(50) CHECK (
+      admission_type IN ('new', 'transfer', 'sibling', 're-admission')
+    ),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    submitted_at TIMESTAMP,
+    UNIQUE(academic_year_id, lead_id)
+);
+CREATE INDEX idx_application_school_id ON application(school_id);
+CREATE INDEX idx_application_lead_id ON application(lead_id);
+CREATE INDEX idx_application_student_id ON application(student_id);
+CREATE INDEX idx_application_academic_year_id ON application(academic_year_id);
+CREATE INDEX idx_application_status ON application(status);
+-- ============================================================================
+-- APPLICATION PROGRESS TRACKING
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_progress (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  -- Step statuses
+  step_1_student_info VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_1_student_info IN ('pending', 'in_progress', 'completed')
+  ),
+  step_2_parent_info VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_2_parent_info IN ('pending', 'in_progress', 'completed')
+  ),
+  step_3_academic_info VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_3_academic_info IN ('pending', 'in_progress', 'completed')
+  ),
+  step_4_photos VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_4_photos IN ('pending', 'in_progress', 'completed')
+  ),
+  step_5_documents VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_5_documents IN ('pending', 'in_progress', 'completed')
+  ),
+  step_6_review VARCHAR(20) DEFAULT 'pending' CHECK (
+    step_6_review IN ('pending', 'in_progress', 'completed')
+  ),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_application_progress_application_id ON application_progress(application_id);
+-- ============================================================================
+-- STEP 1: STUDENT INFO
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_student_info (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  middle_name VARCHAR(100),
+  dob DATE,
+  gender VARCHAR(20),
+  blood_group VARCHAR(10),
+  nationality VARCHAR(100),
+  religion VARCHAR(100),
+  aadhar_number VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_app_student_info_app_id ON application_student_info(application_id);
+-- ============================================================================
+-- STEP 2: PARENT INFO
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_parent_info (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  -- Father info
+  father_name VARCHAR(150),
+  father_occupation VARCHAR(100),
+  father_phone VARCHAR(20),
+  father_email VARCHAR(100),
+  father_aadhar VARCHAR(20),
+  -- Mother info
+  mother_name VARCHAR(150),
+  mother_occupation VARCHAR(100),
+  mother_phone VARCHAR(20),
+  mother_email VARCHAR(100),
+  mother_aadhar VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_app_parent_info_app_id ON application_parent_info(application_id);
+-- ============================================================================
+-- STEP 3: ACADEMIC INFO
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_academic_info (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  grade_applied_for VARCHAR(50),
+  previous_school VARCHAR(255),
+  previous_grade VARCHAR(50),
+  previous_board VARCHAR(100),
+  -- Address
+  street_address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  pincode VARCHAR(10),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_app_academic_info_app_id ON application_academic_info(application_id);
+-- ============================================================================
+-- STEP 4: PHOTOS & IDENTITY
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_photos (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  photo_type VARCHAR(100),
+  -- 'student_photo', 'student_aadhar', 'father_photo', 'father_aadhar', 'mother_photo', 'mother_aadhar'
+  file_path VARCHAR(500),
+  file_size INT,
+  mime_type VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_app_photos_app_id ON application_photos(application_id);
+CREATE INDEX idx_app_photos_photo_type ON application_photos(photo_type);
+-- ============================================================================
+-- STEP 5: DOCUMENTS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS application_documents (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  document_type VARCHAR(100),
+  -- 'birth_certificate', 'address_proof', 'school_records', 'transfer_certificate'
+  file_path VARCHAR(500),
+  file_size INT,
+  mime_type VARCHAR(50),
+  is_required BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_app_documents_app_id ON application_documents(application_id);
+CREATE INDEX idx_app_documents_type ON application_documents(document_type);
+-- ============================================================================
+-- TRIGGERS & CONSTRAINTS
+-- ============================================================================
+-- Update application updated_at on progress change
+CREATE OR REPLACE FUNCTION update_application_timestamp() RETURNS TRIGGER AS $$ BEGIN
+UPDATE application
+SET updated_at = CURRENT_TIMESTAMP
+WHERE id = NEW.application_id;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER trigger_update_app_on_progress_change
+AFTER
+UPDATE ON application_progress FOR EACH ROW EXECUTE FUNCTION update_application_timestamp();
+-- Similar triggers for all step tables
+CREATE TRIGGER trigger_update_app_on_student_info
+AFTER
+INSERT
+  OR
+UPDATE ON application_student_info FOR EACH ROW EXECUTE FUNCTION update_application_timestamp();
+CREATE TRIGGER trigger_update_app_on_parent_info
+AFTER
+INSERT
+  OR
+UPDATE ON application_parent_info FOR EACH ROW EXECUTE FUNCTION update_application_timestamp();
+CREATE TRIGGER trigger_update_app_on_academic_info
+AFTER
+INSERT
+  OR
+UPDATE ON application_academic_info FOR EACH ROW EXECUTE FUNCTION update_application_timestamp();
+-- ============================================================================
+-- Migration: Add indexes for upcoming follow-ups optimization
+-- ============================================================================
+-- Purpose: Optimize queries for the "Upcoming Follow-ups" widget in Admissions Dashboard
+-- 
+-- This migration adds a composite index on the lead table to:
+-- 1. Filter by school_id (multi-tenant isolation)
+-- 2. Filter by follow_up_status (pending, contacted, interested)
+-- 3. Filter by last_contacted_at (non-null values)
+-- 
+-- Expected index usage in query:
+-- SELECT ... FROM lead WHERE school_id = X AND follow_up_status IN (...) AND last_contacted_at IS NOT NULL
+-- Create the composite index for upcoming follow-ups query
+CREATE INDEX IF NOT EXISTS idx_lead_followup_upcoming ON lead(
+  school_id,
+  follow_up_status,
+  last_contacted_at DESC
+)
+WHERE last_contacted_at IS NOT NULL;
+-- Additional index to support filtering by assigned_to for team-based views
+CREATE INDEX IF NOT EXISTS idx_lead_assigned_to ON lead(school_id, assigned_to, follow_up_status)
+WHERE last_contacted_at IS NOT NULL;
+-- Alternative simple index if composite doesn't perform well
+CREATE INDEX IF NOT EXISTS idx_lead_contactdate ON lead(last_contacted_at DESC)
+WHERE school_id IS NOT NULL
+  AND follow_up_status IN ('pending', 'contacted', 'interested');
+-- Index to support sorting by last_contacted_at for various queries
+CREATE INDEX IF NOT EXISTS idx_lead_school_status_date ON lead(
+  school_id,
+  follow_up_status,
+  last_contacted_at DESC
+);
 -- ============================================================================
 -- SQL Script ends
 -- ============================================================================

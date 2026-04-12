@@ -30,6 +30,7 @@ import {
   Cell,
 } from "recharts";
 import { useState, useEffect } from "react";
+// backend imports
 import {
   getDashboardStats,
   getFunnelData,
@@ -39,6 +40,7 @@ import {
   checkBackendHealth,
 } from "../services/dashboardService";
 import UpcomingFollowups from "../components/UpcomingFollowups";
+// here bakend imports ends
 import "../style.css";
 
 const statMeta = [
@@ -343,7 +345,6 @@ export function Dashboard() {
       days: "3d",
     },
   ];
-
 
   return (
     <div className="page">
@@ -698,7 +699,14 @@ export function Dashboard() {
           </div>
           <div className="card-body">
             {monthlyTrendData.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--gray-500)", fontSize: 13 }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 0",
+                  color: "var(--gray-500)",
+                  fontSize: 13,
+                }}
+              >
                 No trend data available
               </div>
             ) : (
