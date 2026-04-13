@@ -8,6 +8,14 @@ const router = express.Router();
 router.use(authMiddleware);
 
 /**
+ * New admission workflow routes
+ */
+router.post('/start', applicationController.startAdmission);
+router.post('/save-step', applicationController.saveAdmissionStep);
+router.get('/resume/:id', applicationController.getAdmissionApplication);
+router.post('/complete', applicationController.completeAdmission);
+
+/**
  * POST /api/applications
  * Create a new application from lead
  */
@@ -54,5 +62,10 @@ router.post('/:id/documents', applicationController.saveDocuments);
  * Submit final application (Step 6)
  */
 router.post('/:id/submit', applicationController.submitApplication);
+
+/**
+ * Alias endpoint for compatibility with /api/admission/:id
+ */
+router.get('/:id', applicationController.getAdmissionApplication);
 
 export default router;

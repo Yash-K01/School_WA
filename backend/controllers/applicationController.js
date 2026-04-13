@@ -290,3 +290,86 @@ export const getApplicationDetails = async (req, res) => {
     });
   }
 };
+
+export const startAdmission = async (req, res) => {
+  try {
+    const result = await applicationService.startAdmissionApplication(
+      req.user.school_id,
+      req.body,
+    );
+
+    res.status(result.resumed ? 200 : 201).json({
+      success: true,
+      data: result,
+      message: result.resumed
+        ? 'Existing draft resumed successfully'
+        : 'Admission application started successfully',
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to start admission application',
+    });
+  }
+};
+
+export const saveAdmissionStep = async (req, res) => {
+  try {
+    const result = await applicationService.saveAdmissionStep(
+      req.user.school_id,
+      req.body,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Step data saved successfully',
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to save step data',
+    });
+  }
+};
+
+export const getAdmissionApplication = async (req, res) => {
+  try {
+    const result = await applicationService.getAdmissionApplicationById(
+      req.user.school_id,
+      req.params.id,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      message: error.message || 'Admission application not found',
+    });
+  }
+};
+
+export const completeAdmission = async (req, res) => {
+  try {
+    const { admission_id } = req.body;
+
+    const result = await applicationService.completeAdmissionApplication(
+      req.user.school_id,
+      admission_id,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Admission confirmed successfully',
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to complete admission application',
+    });
+  }
+};

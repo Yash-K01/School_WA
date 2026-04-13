@@ -111,6 +111,9 @@ app.use('/api/admissions', admissionRoutes);
 // Application routes (multi-step form)
 app.use('/api/applications', applicationRoutes);
 
+// Admission resume workflow alias routes
+app.use('/api/admission', applicationRoutes);
+
 // Parent routes
 app.use('/api/parents', parentRoutes);
 

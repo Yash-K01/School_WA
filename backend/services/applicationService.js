@@ -415,3 +415,438 @@ export const getApplicationDetails = async (applicationId) => {
     throw new Error(`Failed to get application details: ${error.message}`);
   }
 };
+
+const STEP_ORDER = ['student', 'parent', 'academic', 'documents', 'review'];
+
+const ensureAdmissionResumeColumns = async (db) => {
+  await db.query(
+    `ALTER TABLE admission
+     ADD COLUMN IF NOT EXISTS current_step VARCHAR(30) DEFAULT 'student'`,
+  );
+
+  await db.query(
+    `ALTER TABLE admission
+     ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false`,
+  );
+
+  await db.query(
+    `ALTER TABLE student
+     ADD COLUMN IF NOT EXISTS admission_id BIGINT`,
+  );
+
+  await db.query(
+    `ALTER TABLE parent_detail
+     ADD COLUMN IF NOT EXISTS admission_id BIGINT`,
+  );
+};
+
+const getDefaultClassAndSection = async (client, schoolId) => {
+  const classResult = await client.query(
+    `SELECT id FROM school_class WHERE school_id = $1 ORDER BY class_numeric_value ASC LIMIT 1`,
+    [schoolId],
+  );
+
+  if (!classResult.rows.length) {
+    throw new Error('No classes configured for this school');
+  }
+
+  const classId = classResult.rows[0].id;
+
+  const sectionResult = await client.query(
+    `SELECT id FROM section WHERE class_id = $1 ORDER BY section_name ASC LIMIT 1`,
+    [classId],
+  );
+
+  if (!sectionResult.rows.length) {
+    throw new Error('No sections configured for default class');
+  }
+
+  return { classId, sectionId: sectionResult.rows[0].id };
+};
+
+export const startAdmissionApplication = async (schoolId, payload = {}) => {
+  const { lead_id, academic_year_id } = payload;
+  const client = await pool.connect();
+
+  try {
+    if (!schoolId || !lead_id || !academic_year_id) {
+      throw new Error('school_id, lead_id and academic_year_id are required');
+    }
+
+    await client.query('BEGIN');
+    await ensureAdmissionResumeColumns(client);
+
+    const existing = await client.query(
+      `SELECT id, current_step, status
+       FROM admission
+       WHERE school_id = $1 AND lead_id = $2 AND is_completed = false
+       ORDER BY id DESC
+       LIMIT 1`,
+      [schoolId, lead_id],
+    );
+
+    if (existing.rows.length) {
+      await client.query('COMMIT');
+      return {
+        admission_id: existing.rows[0].id,
+        current_step: existing.rows[0].current_step || 'student',
+        status: existing.rows[0].status || 'draft',
+        resumed: true,
+      };
+    }
+
+    const leadResult = await client.query(
+      `SELECT first_name, last_name, phone, email
+       FROM lead
+       WHERE id = $1 AND school_id = $2`,
+      [lead_id, schoolId],
+    );
+
+    if (!leadResult.rows.length) {
+      throw new Error('Lead not found for this school');
+    }
+
+    const { classId, sectionId } = await getDefaultClassAndSection(client, schoolId);
+    const lead = leadResult.rows[0];
+    const admissionNumber = `ADM-DRAFT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+    const studentInsert = await client.query(
+      `INSERT INTO student
+       (school_id, admission_number, first_name, last_name, phone, email, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 'system')
+       RETURNING id`,
+      [
+        schoolId,
+        admissionNumber,
+        lead.first_name || 'Draft',
+        lead.last_name || 'Student',
+        lead.phone || null,
+        lead.email || null,
+      ],
+    );
+
+    const studentId = studentInsert.rows[0].id;
+
+    const admissionInsert = await client.query(
+      `INSERT INTO admission
+       (school_id, student_id, lead_id, academic_year_id, class_id, section_id, admission_date, status, admission_type, current_step, is_completed, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, 'draft', 'new', 'student', false, 'system')
+       RETURNING id, current_step, status`,
+      [schoolId, studentId, lead_id, academic_year_id, classId, sectionId],
+    );
+
+    const admissionId = admissionInsert.rows[0].id;
+
+    await client.query(
+      `UPDATE student SET admission_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [admissionId, studentId],
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      admission_id: admissionId,
+      current_step: admissionInsert.rows[0].current_step,
+      status: admissionInsert.rows[0].status,
+      resumed: false,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw new Error(`Failed to start admission application: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const saveAdmissionStep = async (schoolId, payload = {}) => {
+  const { admission_id, step, data = {} } = payload;
+  const client = await pool.connect();
+
+  try {
+    if (!schoolId || !admission_id || !step || !STEP_ORDER.includes(step)) {
+      throw new Error('Valid school_id, admission_id and step are required');
+    }
+
+    await client.query('BEGIN');
+    await ensureAdmissionResumeColumns(client);
+
+    const admissionResult = await client.query(
+      `SELECT id, student_id FROM admission WHERE id = $1 AND school_id = $2`,
+      [admission_id, schoolId],
+    );
+
+    if (!admissionResult.rows.length) {
+      throw new Error('Admission not found');
+    }
+
+    const studentId = admissionResult.rows[0].student_id;
+
+    if (step === 'student') {
+      await client.query(
+        `INSERT INTO student
+         (id, school_id, admission_id, admission_number, first_name, last_name, date_of_birth, gender, phone, email, status, created_by)
+         VALUES (
+          $1,
+          $2,
+          $3,
+          COALESCE((SELECT admission_number FROM student WHERE id = $1), CONCAT('ADM-DRAFT-', EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT)),
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          'active',
+          'system'
+         )
+         ON CONFLICT (id) DO UPDATE
+         SET admission_id = $3,
+             first_name = COALESCE(EXCLUDED.first_name, student.first_name),
+             last_name = COALESCE(EXCLUDED.last_name, student.last_name),
+             date_of_birth = COALESCE(EXCLUDED.date_of_birth, student.date_of_birth),
+             gender = COALESCE(EXCLUDED.gender, student.gender),
+             phone = COALESCE(EXCLUDED.phone, student.phone),
+             email = COALESCE(EXCLUDED.email, student.email),
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          studentId,
+          schoolId,
+          admission_id,
+          data.first_name || null,
+          data.last_name || null,
+          data.date_of_birth || data.dob || null,
+          data.gender || null,
+          data.phone || data.student_phone || null,
+          data.email || data.student_email || null,
+        ],
+      );
+    }
+
+    if (step === 'parent') {
+      await client.query(
+        `INSERT INTO parent_detail
+         (school_id, student_id, admission_id, relation, first_name, last_name, phone, email, occupation, address, city, income_range)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (admission_id) DO UPDATE
+         SET relation = EXCLUDED.relation,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
+             phone = EXCLUDED.phone,
+             email = EXCLUDED.email,
+             occupation = EXCLUDED.occupation,
+             address = EXCLUDED.address,
+             city = EXCLUDED.city,
+             income_range = EXCLUDED.income_range,
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          schoolId,
+          studentId,
+          admission_id,
+          data.primary_contact_relation || 'Father',
+          data.father_name || data.fatherName || data.primary_contact_person || 'Parent',
+          null,
+          data.primary_contact_phone || data.father_phone || data.fatherPhone || null,
+          data.father_email || data.fatherEmail || null,
+          data.father_occupation || data.fatherOccupation || null,
+          data.address || null,
+          data.city || null,
+          data.income_range || data.incomeRange || null,
+        ],
+      );
+    }
+
+    if (step === 'academic') {
+      await client.query(
+        `INSERT INTO academic
+         (school_id, admission_id, previous_school, last_class_studied, main_subject, percentage, strengths, areas_to_improve)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (admission_id) DO UPDATE
+         SET previous_school = EXCLUDED.previous_school,
+             last_class_studied = EXCLUDED.last_class_studied,
+             main_subject = EXCLUDED.main_subject,
+             percentage = EXCLUDED.percentage,
+             strengths = EXCLUDED.strengths,
+             areas_to_improve = EXCLUDED.areas_to_improve,
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          schoolId,
+          admission_id,
+          data.previous_school || null,
+          data.last_class_studied || data.previous_class || null,
+          data.main_subject || data.subjects || null,
+          data.percentage || null,
+          data.strengths || null,
+          data.areas_to_improve || null,
+        ],
+      );
+    }
+
+    if (step === 'documents') {
+      const photos = data.photos || {};
+      const docs = data.documents || {};
+
+      await client.query(
+        `INSERT INTO student_photos
+         (school_id, admission_id, student_photo, passport_photos)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (admission_id) DO UPDATE
+         SET student_photo = COALESCE(EXCLUDED.student_photo, student_photos.student_photo),
+             passport_photos = COALESCE(EXCLUDED.passport_photos, student_photos.passport_photos),
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          schoolId,
+          admission_id,
+          photos.student_photo || photos.studentPhoto || null,
+          photos.passport_photos || photos.passportPhotos || null,
+        ],
+      );
+
+      await client.query(
+        `INSERT INTO student_documents
+         (school_id, admission_id, birth_certificate, aadhaar_card, passport_photos, transfer_certificate, previous_report_card, address_proof, parent_id_proof)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (admission_id) DO UPDATE
+         SET birth_certificate = COALESCE(EXCLUDED.birth_certificate, student_documents.birth_certificate),
+             aadhaar_card = COALESCE(EXCLUDED.aadhaar_card, student_documents.aadhaar_card),
+             passport_photos = COALESCE(EXCLUDED.passport_photos, student_documents.passport_photos),
+             transfer_certificate = COALESCE(EXCLUDED.transfer_certificate, student_documents.transfer_certificate),
+             previous_report_card = COALESCE(EXCLUDED.previous_report_card, student_documents.previous_report_card),
+             address_proof = COALESCE(EXCLUDED.address_proof, student_documents.address_proof),
+             parent_id_proof = COALESCE(EXCLUDED.parent_id_proof, student_documents.parent_id_proof),
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          schoolId,
+          admission_id,
+          docs.birth_certificate || null,
+          docs.aadhaar_card || docs.aadhaarCard || null,
+          docs.passport_photos || docs.passportPhotos || null,
+          docs.transfer_certificate || null,
+          docs.previous_report_card || docs.previousReportCard || null,
+          docs.address_proof || null,
+          docs.parent_id_proof || docs.parentIdProof || null,
+        ],
+      );
+    }
+
+    await client.query(
+      `UPDATE admission
+       SET current_step = $1,
+           status = 'in_progress',
+           is_completed = false,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND school_id = $3`,
+      [step, admission_id, schoolId],
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      admission_id,
+      current_step: step,
+      status: 'in_progress',
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw new Error(`Failed to save step: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+export const getAdmissionApplicationById = async (schoolId, admissionId) => {
+  await ensureAdmissionResumeColumns(pool);
+
+  const result = await pool.query(
+    `SELECT id, school_id, lead_id, student_id, academic_year_id, class_id, section_id, status, current_step, is_completed, created_at, updated_at
+     FROM admission
+     WHERE id = $1 AND school_id = $2`,
+    [admissionId, schoolId],
+  );
+
+  if (!result.rows.length) {
+    throw new Error('Admission not found');
+  }
+
+  const [studentRes, parentRes, academicRes, photosRes, docsRes] = await Promise.all([
+    pool.query(`SELECT * FROM student WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+    pool.query(`SELECT * FROM parent_detail WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+    pool.query(`SELECT * FROM academic WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+    pool.query(`SELECT * FROM student_photos WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+    pool.query(`SELECT * FROM student_documents WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+  ]);
+
+  return {
+    admission: result.rows[0],
+    student: studentRes.rows[0] || null,
+    parent: parentRes.rows[0] || null,
+    academic: academicRes.rows[0] || null,
+    photos: photosRes.rows[0] || null,
+    documents: docsRes.rows[0] || null,
+    current_step: result.rows[0].current_step || 'student',
+  };
+};
+
+export const completeAdmissionApplication = async (schoolId, admissionId) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    await ensureAdmissionResumeColumns(client);
+
+    const docsRes = await client.query(
+      `SELECT * FROM student_documents WHERE admission_id = $1 LIMIT 1`,
+      [admissionId],
+    );
+
+    const photosRes = await client.query(
+      `SELECT * FROM student_photos WHERE admission_id = $1 LIMIT 1`,
+      [admissionId],
+    );
+
+    const docs = docsRes.rows[0] || {};
+    const photos = photosRes.rows[0] || {};
+
+    const mandatoryDocuments = [
+      'birth_certificate',
+      'aadhaar_card',
+      'passport_photos',
+      'transfer_certificate',
+      'previous_report_card',
+      'address_proof',
+      'parent_id_proof',
+    ];
+
+    const missingDocs = mandatoryDocuments.filter((key) => !docs[key]);
+
+    if (!photos.student_photo) {
+      throw new Error('Student photo is mandatory before confirmation');
+    }
+
+    if (missingDocs.length) {
+      throw new Error(`Missing required documents: ${missingDocs.join(', ')}`);
+    }
+
+    const update = await client.query(
+      `UPDATE admission
+       SET status = 'completed',
+           is_completed = true,
+           current_step = 'review',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND school_id = $2
+       RETURNING id, status, is_completed, current_step`,
+      [admissionId, schoolId],
+    );
+
+    if (!update.rows.length) {
+      throw new Error('Admission not found');
+    }
+
+    await client.query('COMMIT');
+    return update.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw new Error(`Failed to complete admission application: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};

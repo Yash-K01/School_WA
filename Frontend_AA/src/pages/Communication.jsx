@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { Plus, Mail, MessageSquare, Eye, BarChart2, X } from "lucide-react";
 import {
   fetchEmailLogs,
   fetchEmailRecipients,
   fetchEmailStats,
-  fetchEmailTemplates,
   sendEmailMessage,
 } from "../services/emailService.js";
 import {
@@ -12,6 +12,7 @@ import {
   fetchSmsLogs,
   fetchWhatsappLogs,
 } from "../services/communicationService.js";
+import { getToken } from "../utils/authToken.js";
 import "../style.css";
 
 // Dynamic API data used instead of static mock variables
@@ -34,6 +35,8 @@ const msgStatusColor = (s) =>
   ({ delivered: "badge-green", read: "badge-blue", sent: "badge-teal" })[s] ||
   "badge-gray";
 
+axios.defaults.baseURL = "http://localhost:5001";
+
 export function Communication() {
   const [tab, setTab] = useState("email");
   const [compose, setCompose] = useState(false);
@@ -47,13 +50,23 @@ export function Communication() {
     open_rate: 0,
     click_rate: 0,
   });
-  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [stats, setStats] = useState({
+    smsCount: 0,
+    whatsappCount: 0,
+    emailCount: 0,
+  });
+  const [templates, setTemplates] = useState([]);
   const [emailRecipients, setEmailRecipients] = useState([]);
   const [loadingEmailData, setLoadingEmailData] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [sendInProgress, setSendInProgress] = useState(false);
   const [pageError, setPageError] = useState("");
   const [composeError, setComposeError] = useState("");
+  const [templateError, setTemplateError] = useState("");
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
 
   const [composeForm, setComposeForm] = useState({
     recipient_type: "lead",
@@ -62,6 +75,13 @@ export function Communication() {
     subject: "",
     message: "",
     recipient_search: "",
+  });
+
+  const [templateForm, setTemplateForm] = useState({
+    name: "",
+    category: "",
+    subject: "",
+    content: "",
   });
 
   const selectedRecipient = useMemo(
@@ -91,16 +111,13 @@ export function Communication() {
     setPageError("");
 
     try {
-      const [logsResponse, statsResponse, templatesResponse] =
-        await Promise.all([
-          fetchEmailLogs({ limit: 20 }),
-          fetchEmailStats(),
-          fetchEmailTemplates(),
-        ]);
+      const [logsResponse, statsResponse] = await Promise.all([
+        fetchEmailLogs({ limit: 20 }),
+        fetchEmailStats(),
+      ]);
 
       setEmailLogs(logsResponse.logs || []);
       setEmailStats(statsResponse || {});
-      setEmailTemplates(templatesResponse || []);
     } catch (error) {
       setPageError(error.message || "Failed to load email data.");
       setEmailLogs([]);
@@ -112,25 +129,143 @@ export function Communication() {
   const [smsData, setSmsData] = useState([]);
   const [whatsappData, setWhatsappData] = useState([]);
   const [campaignData, setCampaignData] = useState([]);
-  const [templateData, setTemplateData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const getAxiosConfig = () => {
+    const token = getToken();
+
+    if (!token) {
+      return {};
+    }
+
+    return {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  };
+
+  const fetchStats = async () => {
+    setLoadingStats(true);
+
+    try {
+      const config = getAxiosConfig();
+      const [smsRes, waRes, emailStatsRes] = await Promise.all([
+        axios.get("/api/sms/logs", config),
+        axios.get("/api/whatsapp/logs", config),
+        axios.get("/api/email/stats", config),
+      ]);
+
+      const smsList = Array.isArray(smsRes?.data?.data) ? smsRes.data.data : [];
+      const whatsappList = Array.isArray(waRes?.data?.data)
+        ? waRes.data.data
+        : [];
+
+      setStats({
+        smsCount: smsList.length,
+        whatsappCount: whatsappList.length,
+        emailCount: Number(emailStatsRes?.data?.data?.total_emails || 0),
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    setLoadingTemplates(true);
+    setTemplateError("");
+
+    try {
+      const config = getAxiosConfig();
+      const res = await axios.get("/api/email/templates", config);
+      const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setTemplates(list);
+    } catch (err) {
+      console.error(err);
+      setTemplateError("Failed to fetch templates.");
+      setTemplates([]);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setTemplateForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const createTemplate = async () => {
+    if (
+      !templateForm.name.trim() ||
+      !templateForm.category.trim() ||
+      !templateForm.subject.trim() ||
+      !templateForm.content.trim()
+    ) {
+      setTemplateError("All template fields are required.");
+      return;
+    }
+
+    setCreatingTemplate(true);
+    setTemplateError("");
+
+    try {
+      const config = getAxiosConfig();
+      const res = await axios.post(
+        "/api/email/templates",
+        {
+          name: templateForm.name.trim(),
+          category: templateForm.category.trim(),
+          subject: templateForm.subject.trim(),
+          content: templateForm.content.trim(),
+        },
+        config,
+      );
+
+      if (res?.data?.success) {
+        alert("Template created successfully");
+        await fetchTemplates();
+        await fetchStats();
+        setTemplateForm({
+          name: "",
+          category: "",
+          subject: "",
+          content: "",
+        });
+        setTemplateModalOpen(false);
+      } else {
+        setTemplateError(res?.data?.message || "Error creating template.");
+      }
+    } catch (err) {
+      console.error(err);
+      setTemplateError(
+        err?.response?.data?.message || "Error creating template.",
+      );
+      alert("Error creating template");
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
 
-      const [smsRes, waRes, campRes, tempRes] = await Promise.all([
+      const [smsRes, waRes, campRes] = await Promise.all([
         fetchSmsLogs({ limit: 20 }),
         fetchWhatsappLogs({ limit: 20 }),
         fetchCampaigns(),
-        fetchEmailTemplates(),
       ]);
 
       setSmsData(smsRes.logs || []);
       setWhatsappData(waRes.logs || []);
       setCampaignData(campRes || []);
-      setTemplateData(tempRes || []);
     } catch (err) {
       setError(err?.message || "Failed to load communication data");
     } finally {
@@ -176,7 +311,7 @@ export function Communication() {
   };
 
   const handleTemplateChange = (templateId) => {
-    const selectedTemplate = emailTemplates.find(
+    const selectedTemplate = templates.find(
       (template) => String(template.id) === String(templateId),
     );
 
@@ -231,6 +366,8 @@ export function Communication() {
   useEffect(() => {
     loadEmailData();
     fetchAllData();
+    fetchStats();
+    fetchTemplates();
   }, []);
 
   useEffect(() => {
@@ -263,21 +400,21 @@ export function Communication() {
         {[
           {
             label: "Emails Sent",
-            value: loadingEmailData ? "..." : `${emailStats.total_emails || 0}`,
+            value: loadingStats ? "..." : `${stats.emailCount}`,
             icon: Mail,
             color: "var(--blue-bg)",
             ic: "var(--blue)",
           },
           {
             label: "SMS Sent",
-            value: "567",
+            value: loadingStats ? "..." : `${stats.smsCount}`,
             icon: MessageSquare,
             color: "var(--green-bg)",
             ic: "var(--green)",
           },
           {
-            label: "Open Rate",
-            value: loadingEmailData ? "..." : `${emailStats.open_rate || 0}%`,
+            label: "WhatsApp Sent",
+            value: loadingStats ? "..." : `${stats.whatsappCount}`,
             icon: Eye,
             color: "var(--purple-bg)",
             ic: "var(--purple)",
@@ -437,55 +574,52 @@ export function Communication() {
               <div className="card-title">Templates</div>
               <button
                 className="btn btn-ghost btn-icon"
-                onClick={loadEmailData}
+                onClick={() => {
+                  setTemplateError("");
+                  setTemplateModalOpen(true);
+                }}
               >
                 <Plus size={16} />
               </button>
             </div>
             <div className="card-body">
-              {(tab === "email"
-                ? emailTemplates.map((template) => ({
-                    name: template.name,
-                    desc: template.subject || template.content,
-                    tag: template.category || "General",
-                    last: template.last_used_at
-                      ? formatDateTime(template.last_used_at)
-                      : "Never used",
-                  }))
-                : templateData.map((template) => ({
-                    name: template.name,
-                    desc:
-                      template.subject ||
-                      template.content ||
-                      template.message ||
-                      "-",
-                    tag: template.category || "Template",
-                    last: template.created_at
-                      ? new Date(template.created_at).toLocaleString()
-                      : "Unknown",
-                  }))
-              ).map((t, i) => (
-                <div className="template-card" key={i}>
+              {loadingTemplates && (
+                <div style={{ color: "var(--gray-500)", fontSize: 13 }}>
+                  Loading templates...
+                </div>
+              )}
+              {templates.map((template) => (
+                <div className="template-card" key={template.id}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="template-name">{t.name}</span>
+                    <span className="template-name">{template.name}</span>
                     <span
-                      className={`badge ${tagColor(t.tag)}`}
+                      className={`badge ${tagColor(template.category || "General")}`}
                       style={{ fontSize: 11 }}
                     >
-                      {t.tag}
+                      {template.category || "General"}
                     </span>
                   </div>
-                  <div className="template-desc">{t.desc}</div>
-                  <div className="template-meta">Last used: {t.last}</div>
+                  <div className="template-desc">
+                    {template.subject || template.content || "-"}
+                  </div>
+                  <div className="template-meta">
+                    Last used:{" "}
+                    {template.last_used_at
+                      ? formatDateTime(template.last_used_at)
+                      : "Never used"}
+                  </div>
                 </div>
               ))}
-              {tab === "email" &&
-                !loadingEmailData &&
-                emailTemplates.length === 0 && (
-                  <div style={{ color: "var(--gray-500)", fontSize: 13 }}>
-                    No templates created yet.
-                  </div>
-                )}
+              {!loadingTemplates && templates.length === 0 && (
+                <div style={{ color: "var(--gray-500)", fontSize: 13 }}>
+                  No templates created yet.
+                </div>
+              )}
+              {templateError && (
+                <div style={{ color: "var(--red)", fontSize: 13 }}>
+                  {templateError}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -664,7 +798,7 @@ export function Communication() {
                   onChange={(e) => handleTemplateChange(e.target.value)}
                 >
                   <option value="">Select a template (optional)</option>
-                  {emailTemplates.map((template) => (
+                  {templates.map((template) => (
                     <option key={template.id} value={template.id}>
                       {template.name}
                     </option>
@@ -728,6 +862,101 @@ export function Communication() {
                   disabled={sendInProgress}
                 >
                   {sendInProgress ? "Sending..." : "✈ Send Now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {templateModalOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setTemplateModalOpen(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Add Template</div>
+                <div style={{ fontSize: 13, color: "var(--gray-500)" }}>
+                  Create a reusable email template
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => setTemplateModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body space-y-4">
+              <div className="form-group">
+                <label className="form-label">
+                  Template Name <span className="req">*</span>
+                </label>
+                <input
+                  className="form-input"
+                  name="name"
+                  value={templateForm.name}
+                  onChange={handleChange}
+                  placeholder="e.g. Admission Welcome"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Category <span className="req">*</span>
+                </label>
+                <input
+                  className="form-input"
+                  name="category"
+                  value={templateForm.category}
+                  onChange={handleChange}
+                  placeholder="e.g. Onboarding"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Subject <span className="req">*</span>
+                </label>
+                <input
+                  className="form-input"
+                  name="subject"
+                  value={templateForm.subject}
+                  onChange={handleChange}
+                  placeholder="Email subject"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">
+                  Content <span className="req">*</span>
+                </label>
+                <textarea
+                  className="form-textarea"
+                  rows={5}
+                  name="content"
+                  value={templateForm.content}
+                  onChange={handleChange}
+                  placeholder="Write your template content"
+                />
+              </div>
+              {templateError && (
+                <div style={{ color: "var(--red)", fontSize: 13 }}>
+                  {templateError}
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setTemplateModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={createTemplate}
+                  disabled={creatingTemplate}
+                >
+                  {creatingTemplate ? "Saving..." : "Save Template"}
                 </button>
               </div>
             </div>

@@ -63,12 +63,15 @@ export function CreateApplication() {
 
       console.log("✅ Application created with ID:", result.id);
 
+      sessionStorage.setItem("activeAdmissionId", String(result.id));
+
       // Navigate to multi-step form
       navigate(`/applications/form/${result.id}`, {
         state: {
           lead: selected,
           academicYear: form.year,
           admissionType: form.type,
+          resumed: result.resumed,
         },
       });
     } catch (err) {

@@ -1,232 +1,168 @@
 import { getAuthHeader } from '../utils/authToken.js';
 
-const BASE_URL = '/api/applications';
+const BASE_URL = '/api/admission';
+
+const STEP_TO_NUMBER = {
+  student: 1,
+  parent: 2,
+  academic: 3,
+  documents: 5,
+  review: 6,
+};
+
+const NUMBER_TO_STEP = {
+  1: 'student',
+  2: 'parent',
+  3: 'academic',
+  4: 'documents',
+  5: 'documents',
+  6: 'review',
+};
+
+const request = async (url, options = {}) => {
+  const response = await fetch(url, {
+    ...options,
+    headers: getAuthHeader(),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.message || `HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return data;
+};
 
 /**
  * Create a new application from a lead
  */
 export async function createApplicationFromLead(leadId, academicYearId) {
-  try {
-    console.log('📝 Creating new application...');
-    const response = await fetch(BASE_URL, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify({ lead_id: leadId, academic_year_id: academicYearId })
-    });
+  const data = await request(`${BASE_URL}/start`, {
+    method: 'POST',
+    body: JSON.stringify({ lead_id: leadId, academic_year_id: academicYearId }),
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to create application');
-    }
-
-    console.log('✅ Application created:', data.data);
-    return data.data;
-  } catch (error) {
-    console.error('❌ Error creating application:', error);
-    throw error;
-  }
+  return {
+    id: data.data.admission_id,
+    admission_id: data.data.admission_id,
+    current_step: STEP_TO_NUMBER[data.data.current_step] || 1,
+    status: data.data.status,
+    resumed: Boolean(data.data.resumed),
+  };
 }
 
 /**
  * Get application progress and step status
  */
 export async function getApplicationProgress(applicationId) {
-  try {
-    console.log(`📊 Fetching progress for application ${applicationId}...`);
-    const response = await fetch(`${BASE_URL}/${applicationId}/progress`, {
-      method: 'GET',
-      headers: getAuthHeader()
-    });
+  const data = await request(`${BASE_URL}/${applicationId}`, {
+    method: 'GET',
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+  const currentStepKey = data?.data?.current_step || 'student';
+  const currentStep = STEP_TO_NUMBER[currentStepKey] || 1;
 
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to fetch progress');
-    }
-
-    console.log('✅ Progress fetched:', data.data);
-    return data.data;
-  } catch (error) {
-    console.error('❌ Error fetching progress:', error);
-    throw error;
-  }
+  return {
+    current_step: currentStep,
+    current_step_key: currentStepKey,
+    status: data?.data?.admission?.status,
+    steps: {
+      student_info: currentStep > 1 ? 'completed' : 'pending',
+      parent_info: currentStep > 2 ? 'completed' : 'pending',
+      academic_info: currentStep > 3 ? 'completed' : 'pending',
+      photos: currentStep > 4 ? 'completed' : 'pending',
+      documents: currentStep > 5 ? 'completed' : 'pending',
+      review: data?.data?.admission?.is_completed ? 'completed' : 'pending',
+    },
+  };
 }
 
 /**
  * Get application details for prefill
  */
 export async function getApplicationDetails(applicationId) {
-  try {
-    console.log(`📋 Fetching application details ${applicationId}...`);
-    const response = await fetch(`${BASE_URL}/${applicationId}/details`, {
-      method: 'GET',
-      headers: getAuthHeader()
-    });
+  const data = await request(`${BASE_URL}/${applicationId}`, {
+    method: 'GET',
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to fetch details');
-    }
-
-    console.log('✅ Details fetched:', data.data);
-    return data.data;
-  } catch (error) {
-    console.error('❌ Error fetching details:', error);
-    throw error;
-  }
+  return {
+    application: data.data.admission,
+    student_info: data.data.student || {},
+    parent_info: data.data.parent || {},
+    academic_info: data.data.academic || {},
+    photos: data.data.photos || {},
+    documents: data.data.documents || {},
+    current_step: data.data.current_step,
+  };
 }
 
 /**
  * Save student info (Step 1)
  */
 export async function saveStudentInfo(applicationId, studentData) {
-  try {
-    console.log('💾 Saving student info...');
-    const response = await fetch(`${BASE_URL}/${applicationId}/student-info`, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify(studentData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to save student info');
-    }
-
-    console.log('✅ Student info saved');
-    return data;
-  } catch (error) {
-    console.error('❌ Error saving student info:', error);
-    throw error;
-  }
+  return request(`${BASE_URL}/save-step`, {
+    method: 'POST',
+    body: JSON.stringify({
+      admission_id: applicationId,
+      step: 'student',
+      data: studentData,
+    }),
+  });
 }
 
 /**
  * Save parent info (Step 2)
  */
 export async function saveParentInfo(applicationId, parentData) {
-  try {
-    console.log('💾 Saving parent info...');
-    const response = await fetch(`${BASE_URL}/${applicationId}/parent-info`, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify(parentData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to save parent info');
-    }
-
-    console.log('✅ Parent info saved');
-    return data;
-  } catch (error) {
-    console.error('❌ Error saving parent info:', error);
-    throw error;
-  }
+  return request(`${BASE_URL}/save-step`, {
+    method: 'POST',
+    body: JSON.stringify({
+      admission_id: applicationId,
+      step: 'parent',
+      data: parentData,
+    }),
+  });
 }
 
 /**
  * Save academic info (Step 3)
  */
 export async function saveAcademicInfo(applicationId, academicData) {
-  try {
-    console.log('💾 Saving academic info...');
-    const response = await fetch(`${BASE_URL}/${applicationId}/academic-info`, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify(academicData)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to save academic info');
-    }
-
-    console.log('✅ Academic info saved');
-    return data;
-  } catch (error) {
-    console.error('❌ Error saving academic info:', error);
-    throw error;
-  }
+  return request(`${BASE_URL}/save-step`, {
+    method: 'POST',
+    body: JSON.stringify({
+      admission_id: applicationId,
+      step: 'academic',
+      data: academicData,
+    }),
+  });
 }
 
 /**
  * Save documents (Step 5)
  */
 export async function saveDocuments(applicationId, documents) {
-  try {
-    console.log('💾 Saving documents...');
-    const response = await fetch(`${BASE_URL}/${applicationId}/documents`, {
-      method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify({ documents })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to save documents');
-    }
-
-    console.log('✅ Documents saved');
-    return data;
-  } catch (error) {
-    console.error('❌ Error saving documents:', error);
-    throw error;
-  }
+  return request(`${BASE_URL}/save-step`, {
+    method: 'POST',
+    body: JSON.stringify({
+      admission_id: applicationId,
+      step: 'documents',
+      data: documents,
+    }),
+  });
 }
 
 /**
  * Submit application (Step 6 - Final)
  */
 export async function submitApplication(applicationId) {
-  try {
-    console.log('🚀 Submitting application...');
-    const response = await fetch(`${BASE_URL}/${applicationId}/submit`, {
-      method: 'POST',
-      headers: getAuthHeader()
-    });
+  return request(`${BASE_URL}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ admission_id: applicationId }),
+  });
+}
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to submit application');
-    }
-
-    console.log('✅ Application submitted successfully!');
-    return data;
-  } catch (error) {
-    console.error('❌ Error submitting application:', error);
-    throw error;
-  }
+export function mapStepNumberToKey(stepNumber) {
+  return NUMBER_TO_STEP[stepNumber] || 'student';
 }
