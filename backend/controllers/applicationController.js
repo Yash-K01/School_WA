@@ -187,34 +187,53 @@ export const saveParentInfo = async (req, res) => {
  */
 export const saveAcademicInfo = async (req, res) => {
   try {
-    const { id } = req.params;
-    console.log(`📨 POST /api/applications/${id}/academic-info`);
-    console.log("Incoming Body:", JSON.stringify(req.body, null, 2));
+    const applicationId = Number(req.body.application_id ?? req.params.id);
+    const tokenSchoolId = Number(req.user?.school_id);
+    const schoolId = Number(req.body.school_id ?? tokenSchoolId);
 
-    const {
-      desired_class, desiredClass, grade_applied_for, gradeAppliedFor,
-      previous_school, previousSchool,
-      previous_class, previousClass, previous_grade, previousGrade,
-      percentage, gpa,
-      subjects, strengths, areas_to_improve
-    } = req.body;
+    if (!applicationId || Number.isNaN(applicationId)) {
+      return res.status(400).json({ success: false, message: 'Valid application_id is required' });
+    }
+
+    if (!schoolId || Number.isNaN(schoolId)) {
+      return res.status(400).json({ success: false, message: 'Valid school_id is required' });
+    }
+
+    if (tokenSchoolId && schoolId !== tokenSchoolId) {
+      return res.status(403).json({ success: false, message: 'school_id does not match authenticated user' });
+    }
+
+    if (!req.body.desired_class || !String(req.body.desired_class).trim()) {
+      return res.status(400).json({ success: false, message: 'desired_class is required' });
+    }
+
+    if (
+      req.body.marks_percentage !== undefined
+      && req.body.marks_percentage !== null
+      && req.body.marks_percentage !== ''
+    ) {
+      const marks = Number(req.body.marks_percentage);
+      if (Number.isNaN(marks) || marks < 0 || marks > 100) {
+        return res.status(400).json({ success: false, message: 'marks_percentage must be between 0 and 100' });
+      }
+    }
 
     const academicData = {
-      desired_class: desired_class || desiredClass || grade_applied_for || gradeAppliedFor,
-      previous_school: previous_school || previousSchool,
-      previous_class: previous_class || previousClass || previous_grade || previousGrade,
-      percentage: percentage || gpa,
-      subjects: subjects,
-      strengths: strengths,
-      areas_to_improve: areas_to_improve
+      desired_class: String(req.body.desired_class).trim(),
+      previous_school: req.body.previous_school ?? null,
+      previous_class: req.body.previous_class ?? null,
+      marks_percentage: req.body.marks_percentage ?? null,
+      board_name: req.body.board_name ?? null,
+      academic_year: req.body.academic_year ?? null,
+      additional_qualifications: req.body.additional_qualifications ?? null,
+      extracurricular_activities: req.body.extracurricular_activities ?? null,
+      achievements: req.body.achievements ?? null,
     };
 
-    console.log("Mapped Academic Data:", academicData);
-
-    await applicationService.saveAcademicInfo(id, academicData);
+    await applicationService.saveAcademicInfo(applicationId, schoolId, academicData);
     res.json({
       success: true,
-      message: 'Academic information saved successfully'
+      message: 'Academic info saved successfully'
     });
   } catch (error) {
     console.error('❌ Error saving academic info:', error);

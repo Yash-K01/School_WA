@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -18,35 +18,25 @@ import { useApplication } from "../hooks/useApplication";
 import "../style.css";
 import ParentForm from "./ParentForm";
 
-const LAST_CLASS_OPTIONS = [
-  "Playgroup",
+const CLASS_OPTIONS = [
   "Nursery",
   "Jr KG",
   "Sr KG",
-  "I",
-  "II",
-  "III",
-  "IV",
-  "V",
-  "VI",
-  "VII",
-  "VIII",
-  "IX",
-  "X",
-  "XI",
-  "XII",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+  "12",
 ];
 
-const MAIN_SUBJECT_OPTIONS = [
-  "English",
-  "Mathematics",
-  "Science",
-  "Social Studies",
-  "Hindi",
-  "Marathi",
-  "Computer",
-  "General Knowledge",
-];
+const BOARD_OPTIONS = ["CBSE", "ICSE", "State", "IB", "Other"];
 
 const REQUIRED_DOCUMENT_TYPES = [
   "birth_certificate",
@@ -113,12 +103,15 @@ export function MultiStepApplication() {
 
   // Step 3: Academic Information
   const [academicForm, setAcademicForm] = useState({
+    desired_class: "",
     previous_school: "",
-    previous_class: "",
-    percentage: "",
-    subjects: "",
-    strengths: "",
-    areas_to_improve: "",
+    previous_class: "Nursery",
+    marks_percentage: "",
+    board_name: "CBSE",
+    academic_year: "",
+    additional_qualifications: "",
+    extracurricular_activities: "",
+    achievements: "",
   });
 
   // Step 4 & 5: Files
@@ -158,10 +151,36 @@ export function MultiStepApplication() {
     }
   }, [details]);
 
-  // Update step from progress when loaded
   useEffect(() => {
-    if (progress && progress.current_step) {
+    const academicInfo = details?.academic_info || details?.academic;
+    if (!academicInfo) {
+      return;
+    }
+
+    setAcademicForm((prev) => ({
+      ...prev,
+      desired_class: academicInfo.desired_class || prev.desired_class,
+      previous_school: academicInfo.previous_school || "",
+      previous_class: academicInfo.previous_class || prev.previous_class,
+      marks_percentage:
+        academicInfo.marks_percentage === null ||
+        academicInfo.marks_percentage === undefined
+          ? ""
+          : String(academicInfo.marks_percentage),
+      board_name: academicInfo.board_name || prev.board_name,
+      academic_year: academicInfo.academic_year || "",
+      additional_qualifications: academicInfo.additional_qualifications || "",
+      extracurricular_activities: academicInfo.extracurricular_activities || "",
+      achievements: academicInfo.achievements || "",
+    }));
+  }, [details]);
+
+  // Update step from progress ONLY on initial load (not after saves)
+  const initialStepLoaded = useRef(false);
+  useEffect(() => {
+    if (progress && progress.current_step && !initialStepLoaded.current) {
       setStep(progress.current_step);
+      initialStepLoaded.current = true;
     }
   }, [progress]);
 
@@ -266,19 +285,54 @@ export function MultiStepApplication() {
         return;
       } else if (step === 3) {
         const academicErrors = {
-          academic_previous_school: !academicForm.previous_school?.trim(),
-          academic_last_class_studied: !academicForm.previous_class,
-          academic_main_subject: !academicForm.subjects,
+          academic_desired_class: !academicForm.desired_class,
         };
+
+        const marksValue =
+          academicForm.marks_percentage === "" ||
+          academicForm.marks_percentage === null
+            ? null
+            : Number(academicForm.marks_percentage);
+
+        if (
+          marksValue !== null &&
+          (Number.isNaN(marksValue) || marksValue < 0 || marksValue > 100)
+        ) {
+          academicErrors.academic_marks_percentage = true;
+        }
 
         const hasAcademicError = Object.values(academicErrors).some(Boolean);
         if (hasAcademicError) {
           markInvalidAndFocus(academicErrors);
-          setMoveError("Please fill all required academic fields.");
+          setMoveError(
+            "Please provide desired class and ensure marks are between 0 and 100.",
+          );
           setSaving(false);
           return;
         }
-        await handleSaveAcademicInfo(academicForm);
+
+        const payloadApplicationId = details?.application?.application_id || null;
+        const payloadSchoolId =
+          details?.application?.school_id ||
+          details?.application?.schoolId ||
+          null;
+
+        await handleSaveAcademicInfo({
+          application_id: payloadApplicationId,
+          school_id: payloadSchoolId,
+          desired_class: academicForm.desired_class,
+          previous_school: academicForm.previous_school,
+          previous_class: academicForm.previous_class,
+          marks_percentage:
+            academicForm.marks_percentage === ""
+              ? null
+              : Number(academicForm.marks_percentage),
+          board_name: academicForm.board_name,
+          academic_year: academicForm.academic_year,
+          additional_qualifications: academicForm.additional_qualifications,
+          extracurricular_activities: academicForm.extracurricular_activities,
+          achievements: academicForm.achievements,
+        });
       } else if (step === 4) {
         const hasAllRequiredPhotos = REQUIRED_PHOTO_TYPES.every((photoType) =>
           photos.some((photo) => photo.type === photoType),
@@ -720,7 +774,7 @@ export function MultiStepApplication() {
 
       {step === 2 && (
         <ParentForm
-          applicationId={applicationId}
+          applicationId={appId || applicationId}
           lead={details?.lead || details?.application}
           onSuccess={() => setStep(3)}
         />
@@ -738,16 +792,58 @@ export function MultiStepApplication() {
             <div className="grid-2 gap-4 mb-4">
               <div className="form-group">
                 <label className="form-label">
-                  Previous School <span className="req">*</span>
+                  Desired Class <span className="req">*</span>
                 </label>
-                <input
-                  id="academic_previous_school"
-                  className="form-input"
+                <select
+                  id="academic_desired_class"
+                  className="form-select"
                   style={
-                    invalidFields.academic_previous_school
+                    invalidFields.academic_desired_class
                       ? { borderColor: "var(--red)" }
                       : undefined
                   }
+                  value={academicForm.desired_class}
+                  onChange={(e) =>
+                    setAcademicForm((p) => ({
+                      ...p,
+                      desired_class: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Select desired class</option>
+                  {CLASS_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Board Name</label>
+                <select
+                  className="form-select"
+                  value={academicForm.board_name}
+                  onChange={(e) =>
+                    setAcademicForm((p) => ({
+                      ...p,
+                      board_name: e.target.value,
+                    }))
+                  }
+                >
+                  {BOARD_OPTIONS.map((board) => (
+                    <option key={board} value={board}>
+                      {board}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid-2 gap-4 mb-4">
+              <div className="form-group">
+                <label className="form-label">Previous School</label>
+                <input
+                  className="form-input"
                   placeholder="School name"
                   value={academicForm.previous_school}
                   onChange={(e) =>
@@ -759,17 +855,9 @@ export function MultiStepApplication() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">
-                  Last Class Studied <span className="req">*</span>
-                </label>
+                <label className="form-label">Previous Class</label>
                 <select
-                  id="academic_last_class_studied"
                   className="form-select"
-                  style={
-                    invalidFields.academic_last_class_studied
-                      ? { borderColor: "var(--red)" }
-                      : undefined
-                  }
                   value={academicForm.previous_class}
                   onChange={(e) =>
                     setAcademicForm((p) => ({
@@ -778,8 +866,7 @@ export function MultiStepApplication() {
                     }))
                   }
                 >
-                  <option value="">Select class</option>
-                  {LAST_CLASS_OPTIONS.map((c) => (
+                  {CLASS_OPTIONS.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
@@ -789,69 +876,88 @@ export function MultiStepApplication() {
             </div>
 
             <div className="form-group mb-4">
-              <label className="form-label">Last Year Percentage / GPA</label>
+              <label className="form-label">Marks Percentage (0-100)</label>
               <input
+                id="academic_marks_percentage"
                 className="form-input"
-                placeholder="e.g., 85.5 or 3.8"
+                style={
+                  invalidFields.academic_marks_percentage
+                    ? { borderColor: "var(--red)" }
+                    : undefined
+                }
+                placeholder="e.g. 86.5"
                 type="number"
+                min="0"
+                max="100"
                 step="0.01"
-                value={academicForm.percentage}
+                value={academicForm.marks_percentage}
                 onChange={(e) =>
-                  setAcademicForm((p) => ({ ...p, percentage: e.target.value }))
+                  setAcademicForm((p) => ({
+                    ...p,
+                    marks_percentage: e.target.value,
+                  }))
                 }
               />
             </div>
 
             <div className="form-group mb-4">
-              <label className="form-label">
-                Main Subject <span className="req">*</span>
-              </label>
-              <select
-                id="academic_main_subject"
-                className="form-select"
-                style={
-                  invalidFields.academic_main_subject
-                    ? { borderColor: "var(--red)" }
-                    : undefined
-                }
-                value={academicForm.subjects}
+              <label className="form-label">Academic Year</label>
+              <input
+                className="form-input"
+                placeholder="e.g. 2026-27"
+                value={academicForm.academic_year}
                 onChange={(e) =>
-                  setAcademicForm((p) => ({ ...p, subjects: e.target.value }))
+                  setAcademicForm((p) => ({
+                    ...p,
+                    academic_year: e.target.value,
+                  }))
                 }
-              >
-                <option value="">Select main subject</option>
-                {MAIN_SUBJECT_OPTIONS.map((subject) => (
-                  <option key={subject} value={subject}>
-                    {subject}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="form-group mb-4">
-              <label className="form-label">Academic Strengths</label>
+              <label className="form-label">Additional Qualifications</label>
               <textarea
                 className="form-input"
                 style={{ height: 80, resize: "vertical" }}
-                placeholder="Describe academic strengths..."
-                value={academicForm.strengths}
+                placeholder="Mention certifications, language courses, etc."
+                value={academicForm.additional_qualifications}
                 onChange={(e) =>
-                  setAcademicForm((p) => ({ ...p, strengths: e.target.value }))
+                  setAcademicForm((p) => ({
+                    ...p,
+                    additional_qualifications: e.target.value,
+                  }))
                 }
+              />
+            </div>
+
+            <div className="form-group mb-4">
+              <label className="form-label">Extracurricular Activities</label>
+              <textarea
+                className="form-input"
+                style={{ height: 80, resize: "vertical" }}
+                placeholder="Sports, arts, clubs, competitions..."
+                onChange={(e) =>
+                  setAcademicForm((p) => ({
+                    ...p,
+                    extracurricular_activities: e.target.value,
+                  }))
+                }
+                value={academicForm.extracurricular_activities}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Areas for Improvement</label>
+              <label className="form-label">Achievements</label>
               <textarea
                 className="form-input"
                 style={{ height: 80, resize: "vertical" }}
-                placeholder="Describe areas needing support..."
-                value={academicForm.areas_to_improve}
+                placeholder="Academic, sports, or other notable achievements..."
+                value={academicForm.achievements}
                 onChange={(e) =>
                   setAcademicForm((p) => ({
                     ...p,
-                    areas_to_improve: e.target.value,
+                    achievements: e.target.value,
                   }))
                 }
               />
@@ -1068,7 +1174,10 @@ export function MultiStepApplication() {
                       details?.parent_info?.primary_contact_phone ||
                       "-"}
                   </div>
-                  <div>Main Subject: {academicForm.subjects || "-"}</div>
+                  <div>Desired Class: {academicForm.desired_class || "-"}</div>
+                  <div>
+                    Marks Percentage: {academicForm.marks_percentage || "-"}
+                  </div>
                   <div>Current Step: {progress?.current_step || step}</div>
                 </div>
               </div>
@@ -1080,6 +1189,7 @@ export function MultiStepApplication() {
       {/* Navigation Buttons */}
       <div className="flex justify-between mt-6" style={{ gap: 12 }}>
         <button
+          type="button"
           className="btn btn-outline"
           onClick={handlePrevStep}
           disabled={step === 1 || saving}
@@ -1089,6 +1199,7 @@ export function MultiStepApplication() {
 
         {step !== 2 ? (
           <button
+            type="button"
             className="btn btn-primary"
             onClick={step === 6 ? handleSubmit : handleNextStep}
             disabled={saving}

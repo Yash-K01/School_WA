@@ -255,43 +255,111 @@ export const saveParentInfo = async (applicationId, parentData) => {
  * Save academic info (Step 3)
  * POST /api/applications/:id/academic-info
  */
-export const saveAcademicInfo = async (applicationId, academicData) => {
+export const saveAcademicInfo = async (applicationId, schoolId, academicData) => {
   const client = await pool.connect();
   try {
+    if (!applicationId || Number.isNaN(Number(applicationId))) {
+      throw new Error('Valid application_id is required');
+    }
+
+    if (!schoolId || Number.isNaN(Number(schoolId))) {
+      throw new Error('Valid school_id is required');
+    }
+
+    if (!academicData?.desired_class || !String(academicData.desired_class).trim()) {
+      throw new Error('desired_class is required');
+    }
+
+    if (
+      academicData.marks_percentage !== null
+      && academicData.marks_percentage !== undefined
+      && academicData.marks_percentage !== ''
+    ) {
+      const marks = Number(academicData.marks_percentage);
+      if (Number.isNaN(marks) || marks < 0 || marks > 100) {
+        throw new Error('marks_percentage must be between 0 and 100');
+      }
+    }
+
     await client.query('BEGIN');
 
-    console.log(`📝 Saving Academic Info for App: ${applicationId}`);
+    let targetApplicationId = Number(applicationId);
+    console.log(`📝 Saving Academic Info for App: ${targetApplicationId}`);
 
-    // If desired_class is still not specified, try to get it from lead
-    let desiredClass = academicData.desired_class;
-    if (!desiredClass || desiredClass === 'Not specified') {
-      const leadInfo = await client.query(
-        'SELECT desired_class FROM lead l JOIN application a ON a.lead_id = l.id WHERE a.id = $1',
-        [applicationId]
+    const appCheck = await client.query(
+      `SELECT id FROM application WHERE id = $1 AND school_id = $2`,
+      [targetApplicationId, schoolId],
+    );
+
+    if (!appCheck.rows.length) {
+      const admissionCheck = await client.query(
+        `SELECT id, lead_id, academic_year_id, application_id
+         FROM admission
+         WHERE id = $1 AND school_id = $2`,
+        [targetApplicationId, schoolId],
       );
-      if (leadInfo.rows.length > 0) {
-        desiredClass = leadInfo.rows[0].desired_class;
+
+      if (!admissionCheck.rows.length) {
+        throw new Error('Invalid application_id or school_id');
+      }
+
+      const admissionRow = admissionCheck.rows[0];
+
+      if (admissionRow.application_id) {
+        targetApplicationId = Number(admissionRow.application_id);
+      } else {
+        const appNumber = `APP-${new Date().getFullYear()}-${Date.now()}`;
+        const appInsert = await client.query(
+          `INSERT INTO application (school_id, lead_id, academic_year_id, application_number, current_step, status)
+           VALUES ($1, $2, $3, $4, 3, 'in_progress')
+           RETURNING id`,
+          [schoolId, admissionRow.lead_id || null, admissionRow.academic_year_id, appNumber],
+        );
+
+        targetApplicationId = Number(appInsert.rows[0].id);
+
+        await client.query(
+          `UPDATE admission
+           SET application_id = $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND school_id = $3`,
+          [targetApplicationId, admissionRow.id, schoolId],
+        );
       }
     }
 
     const query = `
       INSERT INTO application_academic_info
-      (application_id, desired_class, previous_school, previous_class, marks_percentage, extracurricular_activities, achievements)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (application_id, school_id, desired_class, previous_school, previous_class,
+       marks_percentage, board_name, academic_year,
+       additional_qualifications, extracurricular_activities, achievements)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (application_id) DO UPDATE
-      SET desired_class = $2, previous_school = $3, previous_class = $4, marks_percentage = $5,
-          extracurricular_activities = $6, achievements = $7, updated_at = CURRENT_TIMESTAMP
+      SET desired_class = EXCLUDED.desired_class,
+          previous_school = EXCLUDED.previous_school,
+          previous_class = EXCLUDED.previous_class,
+          marks_percentage = EXCLUDED.marks_percentage,
+          board_name = EXCLUDED.board_name,
+          academic_year = EXCLUDED.academic_year,
+          additional_qualifications = EXCLUDED.additional_qualifications,
+          extracurricular_activities = EXCLUDED.extracurricular_activities,
+          achievements = EXCLUDED.achievements,
+          updated_at = CURRENT_TIMESTAMP
       RETURNING *;
     `;
 
     const values = [
-      applicationId,
-      desiredClass || 'K-01',
+      targetApplicationId,
+      schoolId,
+      String(academicData.desired_class).trim(),
       academicData.previous_school || null,
       academicData.previous_class || null,
-      academicData.percentage || academicData.marks_percentage || null,
-      academicData.subjects || null, // Using subjects as extracurriculars for now
-      academicData.strengths || null  // Using strengths as achievements for now
+      academicData.marks_percentage === '' ? null : academicData.marks_percentage,
+      academicData.board_name || null,
+      academicData.academic_year || null,
+      academicData.additional_qualifications || null,
+      academicData.extracurricular_activities || null,
+      academicData.achievements || null,
     ];
 
     console.log("SQL Values Academic:", JSON.stringify(values));
@@ -299,12 +367,12 @@ export const saveAcademicInfo = async (applicationId, academicData) => {
 
     // Advance current_step to 4
     await client.query(
-      `UPDATE application SET current_step = GREATEST(current_step, 4), updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [applicationId]
+      `UPDATE application SET current_step = 4, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [targetApplicationId],
     );
 
     await client.query('COMMIT');
-    return { success: true, message: 'Academic info saved' };
+    return { success: true, message: 'Academic info saved successfully' };
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('❌ SQL Error in saveAcademicInfo:', error.message);
@@ -323,21 +391,37 @@ export const saveDocuments = async (applicationId, documents) => {
   try {
     await client.query('BEGIN');
 
-    // Delete existing documents for this application
-    await client.query(
-      `DELETE FROM application_documents WHERE application_id = $1`,
-      [applicationId]
-    );
+    // Keep one latest document row per application and upsert it on application_id.
+    const latestDoc = Array.isArray(documents) && documents.length > 0
+      ? documents[documents.length - 1]
+      : null;
 
-    // Insert new documents
-    // Schema: application_id, document_type, file_name (NOT NULL), file_path (NOT NULL), file_size, mime_type
-    for (const doc of documents) {
-      const fileName = doc.file_name || doc.file_path?.split('/').pop() || 'document';
+    if (latestDoc) {
+      const fileName = latestDoc.file_name || latestDoc.file_path?.split('/').pop() || 'document';
       await client.query(
         `INSERT INTO application_documents
          (application_id, document_type, file_name, file_path, file_size, mime_type)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [applicationId, doc.document_type, fileName, doc.file_path || '', doc.file_size || null, doc.mime_type || null]
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (application_id) DO UPDATE
+         SET document_type = EXCLUDED.document_type,
+             file_name = EXCLUDED.file_name,
+             file_path = EXCLUDED.file_path,
+             file_size = EXCLUDED.file_size,
+             mime_type = EXCLUDED.mime_type,
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          applicationId,
+          latestDoc.document_type,
+          fileName,
+          latestDoc.file_path || '',
+          latestDoc.file_size || null,
+          latestDoc.mime_type || null
+        ]
+      );
+    } else {
+      await client.query(
+        `DELETE FROM application_documents WHERE application_id = $1`,
+        [applicationId]
       );
     }
 
@@ -437,6 +521,66 @@ const ensureAdmissionResumeColumns = async (db) => {
   await db.query(
     `ALTER TABLE parent_detail
      ADD COLUMN IF NOT EXISTS admission_id BIGINT`,
+  );
+
+  await db.query(`
+    WITH ranked AS (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY admission_id
+               ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+             ) AS rn
+      FROM parent_detail
+      WHERE admission_id IS NOT NULL
+    )
+    DELETE FROM parent_detail p
+    USING ranked r
+    WHERE p.id = r.id
+      AND r.rn > 1
+  `);
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'unique_parent_detail_admission_id'
+          AND conrelid = 'parent_detail'::regclass
+      ) THEN
+        ALTER TABLE parent_detail
+        ADD CONSTRAINT unique_parent_detail_admission_id UNIQUE (admission_id);
+      END IF;
+    END $$;
+  `);
+
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS student_photos (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+      admission_id BIGINT NOT NULL UNIQUE REFERENCES admission(id) ON DELETE CASCADE,
+      student_photo TEXT,
+      passport_photos TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS student_documents (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+      admission_id BIGINT NOT NULL UNIQUE REFERENCES admission(id) ON DELETE CASCADE,
+      birth_certificate TEXT,
+      aadhaar_card TEXT,
+      passport_photos TEXT,
+      transfer_certificate TEXT,
+      previous_report_card TEXT,
+      address_proof TEXT,
+      parent_id_proof TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
   );
 };
 
@@ -559,20 +703,30 @@ export const startAdmissionApplication = async (schoolId, payload = {}) => {
 };
 
 export const saveAdmissionStep = async (schoolId, payload = {}) => {
-  const { admission_id, step, data = {} } = payload;
+  const rawAdmissionId = payload.admission_id ?? payload.application_id;
+  const admissionId = Number(rawAdmissionId);
+  const { step, data = {} } = payload;
   const client = await pool.connect();
 
   try {
-    if (!schoolId || !admission_id || !step || !STEP_ORDER.includes(step)) {
-      throw new Error('Valid school_id, admission_id and step are required');
+    if (!schoolId) {
+      throw new Error('Valid school_id is required');
+    }
+
+    if (!Number.isInteger(admissionId) || admissionId <= 0) {
+      throw new Error('Valid admission_id is required');
+    }
+
+    if (!step || !STEP_ORDER.includes(step)) {
+      throw new Error('Valid step is required');
     }
 
     await client.query('BEGIN');
     await ensureAdmissionResumeColumns(client);
 
     const admissionResult = await client.query(
-      `SELECT id, student_id FROM admission WHERE id = $1 AND school_id = $2`,
-      [admission_id, schoolId],
+      `SELECT id, student_id, application_id FROM admission WHERE id = $1 AND school_id = $2`,
+      [admissionId, schoolId],
     );
 
     if (!admissionResult.rows.length) {
@@ -580,38 +734,24 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
     }
 
     const studentId = admissionResult.rows[0].student_id;
+    const linkedApplicationId = admissionResult.rows[0].application_id;
 
     if (step === 'student') {
       await client.query(
-        `INSERT INTO student
-         (id, school_id, admission_id, admission_number, first_name, last_name, date_of_birth, gender, phone, email, status, created_by)
-         VALUES (
-          $1,
-          $2,
-          $3,
-          COALESCE((SELECT admission_number FROM student WHERE id = $1), CONCAT('ADM-DRAFT-', EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT)),
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9,
-          'active',
-          'system'
-         )
-         ON CONFLICT (id) DO UPDATE
+        `UPDATE student
          SET admission_id = $3,
-             first_name = COALESCE(EXCLUDED.first_name, student.first_name),
-             last_name = COALESCE(EXCLUDED.last_name, student.last_name),
-             date_of_birth = COALESCE(EXCLUDED.date_of_birth, student.date_of_birth),
-             gender = COALESCE(EXCLUDED.gender, student.gender),
-             phone = COALESCE(EXCLUDED.phone, student.phone),
-             email = COALESCE(EXCLUDED.email, student.email),
-             updated_at = CURRENT_TIMESTAMP`,
+             first_name = COALESCE($4, first_name),
+             last_name = COALESCE($5, last_name),
+             date_of_birth = COALESCE($6, date_of_birth),
+             gender = COALESCE($7, gender),
+             phone = COALESCE($8, phone),
+             email = COALESCE($9, email),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND school_id = $2`,
         [
           studentId,
           schoolId,
-          admission_id,
+          admissionId,
           data.first_name || null,
           data.last_name || null,
           data.date_of_birth || data.dob || null,
@@ -641,7 +781,7 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
         [
           schoolId,
           studentId,
-          admission_id,
+          admissionId,
           data.primary_contact_relation || 'Father',
           data.father_name || data.fatherName || data.primary_contact_person || 'Parent',
           null,
@@ -656,28 +796,50 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
     }
 
     if (step === 'academic') {
+      const targetApplicationId = Number(data.application_id || linkedApplicationId);
+
+      if (!targetApplicationId || Number.isNaN(targetApplicationId)) {
+        throw new Error('application_id is required for academic step');
+      }
+
       await client.query(
-        `INSERT INTO academic
-         (school_id, admission_id, previous_school, last_class_studied, main_subject, percentage, strengths, areas_to_improve)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (admission_id) DO UPDATE
-         SET previous_school = EXCLUDED.previous_school,
-             last_class_studied = EXCLUDED.last_class_studied,
-             main_subject = EXCLUDED.main_subject,
-             percentage = EXCLUDED.percentage,
-             strengths = EXCLUDED.strengths,
-             areas_to_improve = EXCLUDED.areas_to_improve,
+        `INSERT INTO application_academic_info
+         (application_id, school_id, desired_class, previous_school, previous_class,
+          marks_percentage, board_name, academic_year,
+          additional_qualifications, extracurricular_activities, achievements)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (application_id) DO UPDATE
+         SET desired_class = EXCLUDED.desired_class,
+             previous_school = EXCLUDED.previous_school,
+             previous_class = EXCLUDED.previous_class,
+             marks_percentage = EXCLUDED.marks_percentage,
+             board_name = EXCLUDED.board_name,
+             academic_year = EXCLUDED.academic_year,
+             additional_qualifications = EXCLUDED.additional_qualifications,
+             extracurricular_activities = EXCLUDED.extracurricular_activities,
+             achievements = EXCLUDED.achievements,
              updated_at = CURRENT_TIMESTAMP`,
         [
+          targetApplicationId,
           schoolId,
-          admission_id,
+          data.desired_class,
           data.previous_school || null,
-          data.last_class_studied || data.previous_class || null,
-          data.main_subject || data.subjects || null,
-          data.percentage || null,
-          data.strengths || null,
-          data.areas_to_improve || null,
+          data.previous_class || null,
+          data.marks_percentage ?? null,
+          data.board_name || null,
+          data.academic_year || null,
+          data.additional_qualifications || null,
+          data.extracurricular_activities || null,
+          data.achievements || null,
         ],
+      );
+
+      await client.query(
+        `UPDATE application
+         SET current_step = 4,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND school_id = $2`,
+        [targetApplicationId, schoolId],
       );
     }
 
@@ -695,7 +857,7 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
              updated_at = CURRENT_TIMESTAMP`,
         [
           schoolId,
-          admission_id,
+          admissionId,
           photos.student_photo || photos.studentPhoto || null,
           photos.passport_photos || photos.passportPhotos || null,
         ],
@@ -716,7 +878,7 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
              updated_at = CURRENT_TIMESTAMP`,
         [
           schoolId,
-          admission_id,
+          admissionId,
           docs.birth_certificate || null,
           docs.aadhaar_card || docs.aadhaarCard || null,
           docs.passport_photos || docs.passportPhotos || null,
@@ -728,22 +890,28 @@ export const saveAdmissionStep = async (schoolId, payload = {}) => {
       );
     }
 
+    // Advance current_step to the NEXT step so progress shows the right step on resume
+    const currentIndex = STEP_ORDER.indexOf(step);
+    const nextStep = currentIndex >= 0 && currentIndex < STEP_ORDER.length - 1
+      ? STEP_ORDER[currentIndex + 1]
+      : step; // stay on last step (review)
+
     await client.query(
       `UPDATE admission
        SET current_step = $1,
-           status = 'in_progress',
+           status = 'draft',
            is_completed = false,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $2 AND school_id = $3`,
-      [step, admission_id, schoolId],
+      [nextStep, admissionId, schoolId],
     );
 
     await client.query('COMMIT');
 
     return {
-      admission_id,
-      current_step: step,
-      status: 'in_progress',
+      admission_id: admissionId,
+      current_step: nextStep,
+      status: 'draft',
     };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -757,7 +925,7 @@ export const getAdmissionApplicationById = async (schoolId, admissionId) => {
   await ensureAdmissionResumeColumns(pool);
 
   const result = await pool.query(
-    `SELECT id, school_id, lead_id, student_id, academic_year_id, class_id, section_id, status, current_step, is_completed, created_at, updated_at
+    `SELECT id, school_id, lead_id, application_id, student_id, academic_year_id, class_id, section_id, status, current_step, is_completed, created_at, updated_at
      FROM admission
      WHERE id = $1 AND school_id = $2`,
     [admissionId, schoolId],
@@ -767,10 +935,13 @@ export const getAdmissionApplicationById = async (schoolId, admissionId) => {
     throw new Error('Admission not found');
   }
 
+  const applicationId = result.rows[0].application_id;
   const [studentRes, parentRes, academicRes, photosRes, docsRes] = await Promise.all([
     pool.query(`SELECT * FROM student WHERE admission_id = $1 LIMIT 1`, [admissionId]),
     pool.query(`SELECT * FROM parent_detail WHERE admission_id = $1 LIMIT 1`, [admissionId]),
-    pool.query(`SELECT * FROM academic WHERE admission_id = $1 LIMIT 1`, [admissionId]),
+    applicationId
+      ? pool.query(`SELECT * FROM application_academic_info WHERE application_id = $1 LIMIT 1`, [applicationId])
+      : Promise.resolve({ rows: [] }),
     pool.query(`SELECT * FROM student_photos WHERE admission_id = $1 LIMIT 1`, [admissionId]),
     pool.query(`SELECT * FROM student_documents WHERE admission_id = $1 LIMIT 1`, [admissionId]),
   ]);
@@ -828,7 +999,7 @@ export const completeAdmissionApplication = async (schoolId, admissionId) => {
 
     const update = await client.query(
       `UPDATE admission
-       SET status = 'completed',
+       SET status = 'submitted',
            is_completed = true,
            current_step = 'review',
            updated_at = CURRENT_TIMESTAMP

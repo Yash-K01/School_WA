@@ -824,7 +824,8 @@ CREATE INDEX idx_application_assigned_to ON application(assigned_to);
 -- Stores student personal information for the application
 CREATE TABLE application_student_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_student_info_application UNIQUE (application_id),
   first_name VARCHAR(100) NOT NULL,
   middle_name VARCHAR(100),
   last_name VARCHAR(100) NOT NULL,
@@ -850,7 +851,8 @@ CREATE INDEX idx_application_student_info_aadhar ON application_student_info(aad
 -- Stores parent and guardian information for the application
 CREATE TABLE application_parent_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_parent UNIQUE (application_id),
   father_name VARCHAR(150),
   father_occupation VARCHAR(100),
   father_phone VARCHAR(20),
@@ -888,7 +890,9 @@ CREATE INDEX idx_application_parent_info_application_id ON application_parent_in
 -- Stores previous academic information for the application
 CREATE TABLE application_academic_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_academic_info_application UNIQUE (application_id),
+  school_id BIGINT,
   desired_class VARCHAR(100) NOT NULL,
   previous_school VARCHAR(255),
   previous_class VARCHAR(100),
@@ -910,6 +914,7 @@ CREATE INDEX idx_application_academic_info_desired_class ON application_academic
 CREATE TABLE application_documents (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_documents_application UNIQUE (application_id),
   document_type VARCHAR(100) NOT NULL CHECK (
     document_type IN (
       'student_photo',
@@ -1555,7 +1560,8 @@ CREATE INDEX idx_application_progress_application_id ON application_progress(app
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS application_student_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_student_info_application UNIQUE (application_id),
   first_name VARCHAR(100),
   last_name VARCHAR(100),
   middle_name VARCHAR(100),
@@ -1574,7 +1580,8 @@ CREATE INDEX idx_app_student_info_app_id ON application_student_info(application
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS application_parent_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_parent UNIQUE (application_id),
   -- Father info
   father_name VARCHAR(150),
   father_occupation VARCHAR(100),
@@ -1596,7 +1603,9 @@ CREATE INDEX idx_app_parent_info_app_id ON application_parent_info(application_i
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS application_academic_info (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL UNIQUE REFERENCES application(id) ON DELETE CASCADE,
+  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_academic_info_application UNIQUE (application_id),
+  school_id BIGINT,
   grade_applied_for VARCHAR(50),
   previous_school VARCHAR(255),
   previous_grade VARCHAR(50),
@@ -1631,6 +1640,7 @@ CREATE INDEX idx_app_photos_photo_type ON application_photos(photo_type);
 CREATE TABLE IF NOT EXISTS application_documents (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
+  CONSTRAINT unique_application_documents_application UNIQUE (application_id),
   document_type VARCHAR(100),
   -- 'birth_certificate', 'address_proof', 'school_records', 'transfer_certificate'
   file_path VARCHAR(500),

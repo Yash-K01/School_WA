@@ -14,6 +14,7 @@ import {
  * Handles progress tracking, data fetching, and step saving
  */
 export function useApplication(applicationId) {
+  const effectiveApplicationId = applicationId || sessionStorage.getItem('activeAdmissionId');
   const [progress, setProgress] = useState(null);
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ export function useApplication(applicationId) {
 
   // Load progress and details on mount
   useEffect(() => {
-    if (!applicationId) return;
+    if (!effectiveApplicationId) return;
 
     const loadData = async () => {
       try {
@@ -31,8 +32,8 @@ export function useApplication(applicationId) {
 
         // Fetch progress and details in parallel
         const [progressData, detailsData] = await Promise.all([
-          getApplicationProgress(applicationId),
-          getApplicationDetails(applicationId)
+          getApplicationProgress(effectiveApplicationId),
+          getApplicationDetails(effectiveApplicationId)
         ]);
 
         setProgress(progressData);
@@ -52,7 +53,7 @@ export function useApplication(applicationId) {
     };
 
     loadData();
-  }, [applicationId]);
+  }, [effectiveApplicationId]);
 
   // Save student info and advance to next step
   const handleSaveStudentInfo = async (studentData) => {
@@ -60,10 +61,10 @@ export function useApplication(applicationId) {
       setError(null);
       setLoading(true);
 
-      await saveStudentInfo(applicationId, studentData);
+      await saveStudentInfo(effectiveApplicationId, studentData);
 
       // Update progress
-      const updatedProgress = await getApplicationProgress(applicationId);
+      const updatedProgress = await getApplicationProgress(effectiveApplicationId);
       setProgress(updatedProgress);
       setCurrentStep(updatedProgress.current_step);
 
@@ -84,9 +85,9 @@ export function useApplication(applicationId) {
       setError(null);
       setLoading(true);
 
-      await saveParentInfo(applicationId, parentData);
+      await saveParentInfo(effectiveApplicationId, parentData);
 
-      const updatedProgress = await getApplicationProgress(applicationId);
+      const updatedProgress = await getApplicationProgress(effectiveApplicationId);
       setProgress(updatedProgress);
       setCurrentStep(updatedProgress.current_step);
 
@@ -107,9 +108,9 @@ export function useApplication(applicationId) {
       setError(null);
       setLoading(true);
 
-      await saveAcademicInfo(applicationId, academicData);
+      await saveAcademicInfo(effectiveApplicationId, academicData);
 
-      const updatedProgress = await getApplicationProgress(applicationId);
+      const updatedProgress = await getApplicationProgress(effectiveApplicationId);
       setProgress(updatedProgress);
       setCurrentStep(updatedProgress.current_step);
 
@@ -130,9 +131,9 @@ export function useApplication(applicationId) {
       setError(null);
       setLoading(true);
 
-      await saveDocuments(applicationId, documents);
+      await saveDocuments(effectiveApplicationId, documents);
 
-      const updatedProgress = await getApplicationProgress(applicationId);
+      const updatedProgress = await getApplicationProgress(effectiveApplicationId);
       setProgress(updatedProgress);
       setCurrentStep(updatedProgress.current_step);
 
@@ -153,9 +154,9 @@ export function useApplication(applicationId) {
       setError(null);
       setLoading(true);
 
-      await submitApplication(applicationId);
+      await submitApplication(effectiveApplicationId);
 
-      const updatedProgress = await getApplicationProgress(applicationId);
+      const updatedProgress = await getApplicationProgress(effectiveApplicationId);
       setProgress(updatedProgress);
 
       console.log('✅ Application submitted!');
@@ -177,7 +178,7 @@ export function useApplication(applicationId) {
   };
 
   return {
-    applicationId,
+    applicationId: effectiveApplicationId,
     progress,
     details,
     loading,

@@ -1,4 +1,4 @@
-import { getAuthHeader } from '../utils/authToken.js';
+import { getAuthHeader, getUserData } from '../utils/authToken.js';
 
 const BASE_URL = '/api/admission';
 
@@ -19,16 +19,37 @@ const NUMBER_TO_STEP = {
   6: 'review',
 };
 
+const resolveAdmissionId = (candidateId) => {
+  if (candidateId !== undefined && candidateId !== null && String(candidateId).trim() !== '') {
+    return Number(candidateId);
+  }
+
+  const storedId = sessionStorage.getItem('activeAdmissionId');
+  if (storedId && storedId.trim() !== '') {
+    return Number(storedId);
+  }
+
+  return null;
+};
+
 const request = async (url, options = {}) => {
+  const authHeaders = getAuthHeader() || {};
+  const mergedHeaders = {
+    'Content-Type': 'application/json',
+    ...authHeaders,
+    ...(options.headers || {}),
+  };
+
   const response = await fetch(url, {
     ...options,
-    headers: getAuthHeader(),
+    headers: mergedHeaders,
   });
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok || !data?.success) {
-    throw new Error(data?.message || `HTTP ${response.status}: ${response.statusText}`);
+    const serverMessage = data?.message || data?.error;
+    throw new Error(serverMessage || `HTTP ${response.status}: ${response.statusText}`);
   }
 
   return data;
@@ -60,7 +81,7 @@ export async function getApplicationProgress(applicationId) {
     method: 'GET',
   });
 
-  const currentStepKey = data?.data?.current_step || 'student';
+  const currentStepKey = data?.data?.admission?.current_step || data?.data?.current_step || 'student';
   const currentStep = STEP_TO_NUMBER[currentStepKey] || 1;
 
   return {
@@ -101,10 +122,15 @@ export async function getApplicationDetails(applicationId) {
  * Save student info (Step 1)
  */
 export async function saveStudentInfo(applicationId, studentData) {
+  const admissionId = resolveAdmissionId(applicationId);
+  if (!admissionId || Number.isNaN(admissionId)) {
+    throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
+  }
+
   return request(`${BASE_URL}/save-step`, {
     method: 'POST',
     body: JSON.stringify({
-      admission_id: applicationId,
+      admission_id: admissionId,
       step: 'student',
       data: studentData,
     }),
@@ -115,10 +141,15 @@ export async function saveStudentInfo(applicationId, studentData) {
  * Save parent info (Step 2)
  */
 export async function saveParentInfo(applicationId, parentData) {
+  const admissionId = resolveAdmissionId(applicationId);
+  if (!admissionId || Number.isNaN(admissionId)) {
+    throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
+  }
+
   return request(`${BASE_URL}/save-step`, {
     method: 'POST',
     body: JSON.stringify({
-      admission_id: applicationId,
+      admission_id: admissionId,
       step: 'parent',
       data: parentData,
     }),
@@ -129,13 +160,34 @@ export async function saveParentInfo(applicationId, parentData) {
  * Save academic info (Step 3)
  */
 export async function saveAcademicInfo(applicationId, academicData) {
-  return request(`${BASE_URL}/save-step`, {
+  const resolvedApplicationId = Number(academicData?.application_id ?? resolveAdmissionId(applicationId));
+  if (!resolvedApplicationId || Number.isNaN(resolvedApplicationId)) {
+    throw new Error('Application ID is missing. Please restart the application flow from Create Application.');
+  }
+
+  const userData = getUserData() || {};
+  const resolvedSchoolId = Number(academicData?.school_id ?? userData.school_id);
+  if (!resolvedSchoolId || Number.isNaN(resolvedSchoolId)) {
+    throw new Error('School ID is missing from session. Please login again and retry.');
+  }
+
+  const payload = {
+    application_id: resolvedApplicationId,
+    school_id: resolvedSchoolId,
+    desired_class: academicData?.desired_class || '',
+    previous_school: academicData?.previous_school || null,
+    previous_class: academicData?.previous_class || null,
+    marks_percentage: academicData?.marks_percentage === '' ? null : academicData?.marks_percentage ?? null,
+    board_name: academicData?.board_name || null,
+    academic_year: academicData?.academic_year || null,
+    additional_qualifications: academicData?.additional_qualifications || null,
+    extracurricular_activities: academicData?.extracurricular_activities || null,
+    achievements: academicData?.achievements || null,
+  };
+
+  return request(`/api/applications/${resolvedApplicationId}/academic-info`, {
     method: 'POST',
-    body: JSON.stringify({
-      admission_id: applicationId,
-      step: 'academic',
-      data: academicData,
-    }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -143,10 +195,15 @@ export async function saveAcademicInfo(applicationId, academicData) {
  * Save documents (Step 5)
  */
 export async function saveDocuments(applicationId, documents) {
+  const admissionId = resolveAdmissionId(applicationId);
+  if (!admissionId || Number.isNaN(admissionId)) {
+    throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
+  }
+
   return request(`${BASE_URL}/save-step`, {
     method: 'POST',
     body: JSON.stringify({
-      admission_id: applicationId,
+      admission_id: admissionId,
       step: 'documents',
       data: documents,
     }),
