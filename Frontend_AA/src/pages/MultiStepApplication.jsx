@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,21 +19,13 @@ import "../style.css";
 import ParentForm from "./ParentForm";
 
 const CLASS_OPTIONS = [
-  "Nursery",
-  "Jr KG",
-  "Sr KG",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
-  "12",
+  { value: "Nursery", label: "Nursery" },
+  { value: "Jr KG", label: "Jr KG" },
+  { value: "Sr KG", label: "Sr KG" },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    value: `Class ${index + 1}`,
+    label: `Class ${index + 1}`,
+  })),
 ];
 
 const BOARD_OPTIONS = ["CBSE", "ICSE", "State", "IB", "Other"];
@@ -49,6 +41,128 @@ const REQUIRED_DOCUMENT_TYPES = [
 ];
 
 const REQUIRED_PHOTO_TYPES = ["student_photo"];
+
+const generateAcademicYears = (currentYear) => [
+  `${currentYear}-${(currentYear + 1).toString().slice(-2)}`,
+  `${currentYear - 1}-${currentYear.toString().slice(-2)}`,
+  `${currentYear - 2}-${(currentYear - 1).toString().slice(-2)}`,
+  `${currentYear - 3}-${(currentYear - 2).toString().slice(-2)}`,
+];
+
+const normalizeClassValue = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  const normalized = String(value).trim();
+  if (/^Nursery$/i.test(normalized)) {
+    return "Nursery";
+  }
+
+  if (/^Jr\s*KG$/i.test(normalized)) {
+    return "Jr KG";
+  }
+
+  if (/^Sr\s*KG$/i.test(normalized)) {
+    return "Sr KG";
+  }
+
+  const match = normalized.match(/^(?:Class\s*)?(\d{1,2})$/i);
+  if (match) {
+    return `Class ${match[1]}`;
+  }
+
+  return normalized;
+};
+
+const getPreviousClassValue = (desiredClass) => {
+  const normalized = normalizeClassValue(desiredClass);
+
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized === "Nursery") {
+    return "No Formal Schooling / New Admission";
+  }
+
+  if (normalized === "Jr KG") {
+    return "Nursery";
+  }
+
+  if (normalized === "Sr KG") {
+    return "Jr KG";
+  }
+
+  const classMatch = normalized.match(/^Class\s*(\d{1,2})$/i);
+  if (classMatch) {
+    const classNumber = Number(classMatch[1]);
+    if (classNumber === 1) {
+      return "Sr KG";
+    }
+
+    return `Class ${classNumber - 1}`;
+  }
+
+  return "";
+};
+
+const normalizeStoredFileRecord = (record) => {
+  if (!record) {
+    return null;
+  }
+
+  if (typeof record === "string") {
+    const fileName = record.split("/").pop() || record;
+    const publicUrl = getPublicUploadUrl(record);
+    return {
+      name: fileName,
+      file_path: record,
+      url: publicUrl,
+      mime_type: "",
+      fromServer: true,
+    };
+  }
+
+  const filePath = record.file_path || record.file_url || record.url || record.path || "";
+  const fileName = record.file_name || record.name || filePath.split("/").pop() || "File";
+  const publicUrl = getPublicUploadUrl(filePath);
+
+  return {
+    ...record,
+    name: fileName,
+    file_path: filePath,
+    url: record.file_url || publicUrl,
+    mime_type: record.mime_type || record.mimeType || "",
+    fromServer: true,
+  };
+};
+
+const buildLocalFileRecord = (type, file) => ({
+  type,
+  name: file.name,
+  file,
+  url: URL.createObjectURL(file),
+  mime_type: file.type,
+  file_size: file.size,
+});
+
+const getPublicUploadUrl = (filePath) => {
+  if (!filePath) {
+    return "";
+  }
+
+  if (String(filePath).startsWith("http")) {
+    return String(filePath);
+  }
+
+  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
+  const normalizedPath = String(filePath).startsWith("/")
+    ? String(filePath)
+    : `/uploads/${String(filePath).split("/").pop()}`;
+
+  return `${backendBaseUrl}${normalizedPath}`;
+};
 /**
  * MultiStepApplication Component
  * Complete 6-step application form with auto-fill from lead data
@@ -85,6 +199,10 @@ export function MultiStepApplication() {
   const [saving, setSaving] = useState(false);
   const [moveError, setMoveError] = useState("");
   const [invalidFields, setInvalidFields] = useState({});
+  const [previewItem, setPreviewItem] = useState(null);
+  const [currentAcademicYear, setCurrentAcademicYear] = useState(
+    new Date().getFullYear(),
+  );
 
   // Step 1: Student Information
   const [studentForm, setStudentForm] = useState({
@@ -105,10 +223,10 @@ export function MultiStepApplication() {
   const [academicForm, setAcademicForm] = useState({
     desired_class: "",
     previous_school: "",
-    previous_class: "Nursery",
+    previous_class: "",
     marks_percentage: "",
     board_name: "CBSE",
-    academic_year: "",
+    academic_year: generateAcademicYears(new Date().getFullYear())[0],
     additional_qualifications: "",
     extracurricular_activities: "",
     achievements: "",
@@ -152,6 +270,16 @@ export function MultiStepApplication() {
   }, [details]);
 
   useEffect(() => {
+    const nextYear = new Date().getFullYear() + 1;
+    const timeoutMs = new Date(nextYear, 0, 1, 0, 0, 1).getTime() - Date.now();
+    const timer = window.setTimeout(() => {
+      setCurrentAcademicYear(new Date().getFullYear());
+    }, Math.max(timeoutMs, 1000));
+
+    return () => window.clearTimeout(timer);
+  }, [currentAcademicYear]);
+
+  useEffect(() => {
     const academicInfo = details?.academic_info || details?.academic;
     if (!academicInfo) {
       return;
@@ -159,21 +287,32 @@ export function MultiStepApplication() {
 
     setAcademicForm((prev) => ({
       ...prev,
-      desired_class: academicInfo.desired_class || prev.desired_class,
+      desired_class:
+        normalizeClassValue(
+          academicInfo.desired_class || details?.application?.desired_class || prev.desired_class,
+        ),
       previous_school: academicInfo.previous_school || "",
-      previous_class: academicInfo.previous_class || prev.previous_class,
+      previous_class:
+        normalizeClassValue(academicInfo.previous_class || prev.previous_class) ||
+        getPreviousClassValue(
+          academicInfo.desired_class || details?.application?.desired_class || prev.desired_class,
+        ),
       marks_percentage:
         academicInfo.marks_percentage === null ||
         academicInfo.marks_percentage === undefined
           ? ""
           : String(academicInfo.marks_percentage),
       board_name: academicInfo.board_name || prev.board_name,
-      academic_year: academicInfo.academic_year || "",
+      academic_year:
+        academicInfo.academic_year ||
+        details?.application?.academic_year_name ||
+        prev.academic_year ||
+        generateAcademicYears(currentAcademicYear)[0],
       additional_qualifications: academicInfo.additional_qualifications || "",
       extracurricular_activities: academicInfo.extracurricular_activities || "",
       achievements: academicInfo.achievements || "",
     }));
-  }, [details]);
+  }, [details, currentAcademicYear]);
 
   // Update step from progress ONLY on initial load (not after saves)
   const initialStepLoaded = useRef(false);
@@ -191,34 +330,46 @@ export function MultiStepApplication() {
   }, [applicationId]);
 
   useEffect(() => {
-    if (details?.photos?.student_photo) {
-      setPhotos((prev) =>
-        prev.some((item) => item.type === "student_photo")
-          ? prev
-          : [
-              ...prev,
-              {
-                type: "student_photo",
-                name: details.photos.student_photo,
-                fromServer: true,
-              },
-            ],
-      );
+    if (details?.photos) {
+      const nextPhotos = Object.entries(details.photos).reduce((accumulator, [photoType, record]) => {
+        accumulator[photoType] = normalizeStoredFileRecord(record);
+        return accumulator;
+      }, {});
+
+      if (Object.keys(nextPhotos).length) {
+        setPhotos((prev) => {
+          const merged = [...prev];
+          Object.entries(nextPhotos).forEach(([photoType, record]) => {
+            const index = merged.findIndex((item) => item.type === photoType);
+            if (index >= 0) {
+              if (!merged[index].file) {
+                merged[index] = { ...merged[index], ...record, type: photoType };
+              }
+            } else {
+              merged.push({ type: photoType, ...record });
+            }
+          });
+          return merged;
+        });
+      }
     }
 
     if (details?.documents) {
-      const nextDocs = {};
-      REQUIRED_DOCUMENT_TYPES.forEach((docType) => {
-        if (details.documents[docType]) {
-          nextDocs[docType] = {
-            name: details.documents[docType],
-            fromServer: true,
-          };
-        }
-      });
+      const nextDocs = Object.entries(details.documents).reduce((accumulator, [docType, record]) => {
+        accumulator[docType] = normalizeStoredFileRecord(record);
+        return accumulator;
+      }, {});
 
       if (Object.keys(nextDocs).length) {
-        setDocuments((prev) => ({ ...nextDocs, ...prev }));
+        setDocuments((prev) => {
+          const merged = { ...prev };
+          Object.entries(nextDocs).forEach(([docType, record]) => {
+            if (!merged[docType] || !merged[docType].file) {
+              merged[docType] = record;
+            }
+          });
+          return merged;
+        });
       }
     }
   }, [details]);
@@ -311,7 +462,8 @@ export function MultiStepApplication() {
           return;
         }
 
-        const payloadApplicationId = details?.application?.application_id || null;
+        const payloadApplicationId =
+          details?.application?.application_id || null;
         const payloadSchoolId =
           details?.application?.school_id ||
           details?.application?.schoolId ||
@@ -345,11 +497,11 @@ export function MultiStepApplication() {
         }
 
         await handleSaveDocuments({
+          stage: "photos",
           photos: {
-            student_photo:
-              photos.find((p) => p.type === "student_photo")?.name || "",
+            student_photo: photos.find((p) => p.type === "student_photo") || null,
             passport_photos:
-              photos.find((p) => p.type === "passport_photos")?.name || "",
+              photos.find((p) => p.type === "passport_photos") || null,
           },
           documents: {},
         });
@@ -366,18 +518,13 @@ export function MultiStepApplication() {
         }
 
         await handleSaveDocuments({
+          stage: "documents",
           photos: {
-            student_photo:
-              photos.find((p) => p.type === "student_photo")?.name || "",
+            student_photo: photos.find((p) => p.type === "student_photo") || null,
             passport_photos:
-              photos.find((p) => p.type === "passport_photos")?.name || "",
+              photos.find((p) => p.type === "passport_photos") || null,
           },
-          documents: Object.fromEntries(
-            Object.entries(documents).map(([key, value]) => [
-              key,
-              value?.name || "",
-            ]),
-          ),
+          documents,
         });
       }
 
@@ -424,7 +571,12 @@ export function MultiStepApplication() {
 
     setPhotos((prev) => {
       const next = prev.filter((item) => item.type !== photoType);
-      next.push({ type: photoType, name: file.name, file });
+      const previous = prev.find((item) => item.type === photoType);
+      if (previous?.url?.startsWith("blob:")) {
+        URL.revokeObjectURL(previous.url);
+      }
+
+      next.push(buildLocalFileRecord(photoType, file));
       return next;
     });
   };
@@ -436,8 +588,96 @@ export function MultiStepApplication() {
 
     setDocuments((prev) => ({
       ...prev,
-      [docType]: { name: file.name, file },
+      [docType]: buildLocalFileRecord(docType, file),
     }));
+  };
+
+  const openPreview = (record, title) => {
+    if (!record) {
+      return;
+    }
+
+    setPreviewItem({
+      title,
+      name: record.name,
+      url: record.url || record.file_path,
+      mimeType: record.mime_type || record.mimeType || "",
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      photos.forEach((photo) => {
+        if (photo?.url?.startsWith("blob:")) {
+          URL.revokeObjectURL(photo.url);
+        }
+      });
+
+      Object.values(documents).forEach((document) => {
+        if (document?.url?.startsWith("blob:")) {
+          URL.revokeObjectURL(document.url);
+        }
+      });
+    };
+  }, [photos, documents]);
+
+  const academicYearOptions = [
+    ...new Set([
+      ...generateAcademicYears(currentAcademicYear),
+      academicForm.academic_year,
+    ].filter(Boolean)),
+  ];
+
+  const progressSteps = [
+    { num: 1, label: "Student", icon: User },
+    { num: 2, label: "Parent", icon: Users },
+    { num: 3, label: "Academic", icon: BookOpen },
+    { num: 4, label: "Photos", icon: Camera },
+    { num: 5, label: "Documents", icon: File },
+    { num: 6, label: "Review", icon: CheckCircle },
+  ];
+
+  const renderFileList = (records, emptyLabel) => {
+    if (!records || (Array.isArray(records) && records.length === 0)) {
+      return <div style={{ color: "var(--gray-500)", fontSize: 13 }}>{emptyLabel}</div>;
+    }
+
+    const entries = Array.isArray(records) ? records : Object.values(records);
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        {entries.map((record) => (
+          <div
+            key={`${record.type || record.document_type || record.photo_type}-${record.name}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "10px 12px",
+              border: "1px solid var(--gray-200)",
+              borderRadius: 10,
+              background: "white",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{record.name || "File"}</div>
+              <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
+                {record.file_path || record.url || "Uploaded file"}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() =>
+                openPreview(record, record.type || record.document_type || record.photo_type || "File")
+              }
+            >
+              View
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   // Loading state
@@ -507,34 +747,29 @@ export function MultiStepApplication() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="mb-8">
-        <div className="progress-steps">
-          {[
-            { num: 1, label: "Student", icon: User },
-            { num: 2, label: "Parent", icon: Users },
-            { num: 3, label: "Academic", icon: BookOpen },
-            { num: 4, label: "Photos", icon: Camera },
-            { num: 5, label: "Documents", icon: File },
-            { num: 6, label: "Review", icon: CheckCircle },
-          ].map((s) => {
-            const Icon = s.icon;
-            const isCompleted = isStepCompleted(s.num);
-            const isCurrent = s.num === step;
+      <div className="mb-8" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {progressSteps.map((s, index) => {
+          const Icon = s.icon;
+          const isCompleted = isStepCompleted(s.num);
+          const isCurrent = s.num === step;
+          const isDisabled = s.num > step && !isCompleted;
 
-            return (
+          return (
+            <Fragment key={s.num}>
               <div
-                key={s.num}
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  flex: 1,
+                  minWidth: 64,
+                  flex: "0 0 auto",
+                  opacity: isDisabled ? 0.45 : 1,
                 }}
               >
                 <div
                   style={{
-                    width: 50,
-                    height: 50,
+                    width: 44,
+                    height: 44,
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
@@ -544,28 +779,32 @@ export function MultiStepApplication() {
                       : isCurrent
                         ? "var(--primary)"
                         : "var(--gray-200)",
-                    color:
-                      isCompleted || isCurrent ? "white" : "var(--gray-600)",
-                    fontSize: 18,
-                    marginBottom: 8,
-                    border: isCurrent ? "3px solid var(--primary)" : "none",
-                    fontWeight: isCurrent ? 600 : 400,
-                    boxShadow: isCurrent
-                      ? "0 0 0 4px rgba(59, 130, 246, 0.1)"
-                      : "none",
+                    color: isCompleted || isCurrent ? "white" : "var(--gray-600)",
+                    border: isCurrent ? "3px solid rgba(37, 99, 235, 0.18)" : "1px solid var(--gray-300)",
+                    boxShadow: isCurrent ? "0 12px 24px rgba(37, 99, 235, 0.16)" : "none",
                   }}
                 >
-                  {isCompleted ? <CheckCircle size={24} /> : <Icon size={18} />}
+                  {isCompleted ? <CheckCircle size={20} /> : <Icon size={18} />}
                 </div>
-                <div
-                  style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400 }}
-                >
+                <div style={{ fontSize: 12, fontWeight: isCurrent ? 700 : 500, marginTop: 8 }}>
                   {s.label}
                 </div>
               </div>
-            );
-          })}
-        </div>
+              {index < progressSteps.length - 1 && (
+                <div
+                  style={{
+                    height: 2,
+                    flex: 1,
+                    minWidth: 14,
+                    background: isStepCompleted(s.num) ? "var(--green)" : "var(--gray-200)",
+                    borderRadius: 999,
+                    marginTop: -18,
+                  }}
+                />
+              )}
+            </Fragment>
+          );
+        })}
       </div>
 
       {/* Error Messages */}
@@ -776,6 +1015,7 @@ export function MultiStepApplication() {
         <ParentForm
           applicationId={appId || applicationId}
           lead={details?.lead || details?.application}
+          initialData={details?.parent_info}
           onSuccess={() => setStep(3)}
         />
       )}
@@ -806,14 +1046,15 @@ export function MultiStepApplication() {
                   onChange={(e) =>
                     setAcademicForm((p) => ({
                       ...p,
-                      desired_class: e.target.value,
+                      desired_class: normalizeClassValue(e.target.value),
+                      previous_class: getPreviousClassValue(e.target.value),
                     }))
                   }
                 >
                   <option value="">Select desired class</option>
                   {CLASS_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                    <option key={c.value} value={c.value}>
+                      {c.label}
                     </option>
                   ))}
                 </select>
@@ -866,9 +1107,16 @@ export function MultiStepApplication() {
                     }))
                   }
                 >
+                  <option value="">Select previous class</option>
+                  <option value="No Formal Schooling / New Admission">
+                    No Formal Schooling / New Admission
+                  </option>
+                  <option value="Nursery">Nursery</option>
+                  <option value="Jr KG">Jr KG</option>
+                  <option value="Sr KG">Sr KG</option>
                   {CLASS_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                    <option key={c.value} value={c.value}>
+                      {c.label}
                     </option>
                   ))}
                 </select>
@@ -902,9 +1150,8 @@ export function MultiStepApplication() {
 
             <div className="form-group mb-4">
               <label className="form-label">Academic Year</label>
-              <input
-                className="form-input"
-                placeholder="e.g. 2026-27"
+              <select
+                className="form-select"
                 value={academicForm.academic_year}
                 onChange={(e) =>
                   setAcademicForm((p) => ({
@@ -912,7 +1159,14 @@ export function MultiStepApplication() {
                     academic_year: e.target.value,
                   }))
                 }
-              />
+              >
+                <option value="">Select academic year</option>
+                {academicYearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group mb-4">
@@ -979,18 +1233,31 @@ export function MultiStepApplication() {
               <label className="form-label">
                 Student Photo <span className="req">*</span>
               </label>
-              <input
-                id="photo_student_photo"
-                type="file"
-                className="form-input"
-                accept="image/*"
-                onChange={(e) =>
-                  handlePhotoUpload("student_photo", e.target.files?.[0])
-                }
-              />
-              <div
-                style={{ marginTop: 6, fontSize: 12, color: "var(--gray-500)" }}
-              >
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input
+                  id="photo_student_photo"
+                  type="file"
+                  className="form-input"
+                  accept="image/*"
+                  onChange={(e) =>
+                    handlePhotoUpload("student_photo", e.target.files?.[0])
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() =>
+                    openPreview(
+                      photos.find((p) => p.type === "student_photo"),
+                      "Student Photo",
+                    )
+                  }
+                  disabled={!photos.find((p) => p.type === "student_photo")}
+                >
+                  View
+                </button>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 12, color: "var(--gray-500)" }}>
                 {photos.find((p) => p.type === "student_photo")?.name ||
                   "No file selected"}
               </div>
@@ -998,15 +1265,30 @@ export function MultiStepApplication() {
 
             <div className="form-group mb-2">
               <label className="form-label">Passport Photos</label>
-              <input
-                id="photo_passport_photos"
-                type="file"
-                className="form-input"
-                accept="image/*"
-                onChange={(e) =>
-                  handlePhotoUpload("passport_photos", e.target.files?.[0])
-                }
-              />
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input
+                  id="photo_passport_photos"
+                  type="file"
+                  className="form-input"
+                  accept="image/*"
+                  onChange={(e) =>
+                    handlePhotoUpload("passport_photos", e.target.files?.[0])
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() =>
+                    openPreview(
+                      photos.find((p) => p.type === "passport_photos"),
+                      "Passport Photos",
+                    )
+                  }
+                  disabled={!photos.find((p) => p.type === "passport_photos")}
+                >
+                  View
+                </button>
+              </div>
               <div
                 style={{ marginTop: 6, fontSize: 12, color: "var(--gray-500)" }}
               >
@@ -1048,15 +1330,25 @@ export function MultiStepApplication() {
                 <label className="form-label">
                   {doc.label} <span className="req">*</span>
                 </label>
-                <input
-                  id={`document_${doc.key}`}
-                  type="file"
-                  className="form-input"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  onChange={(e) =>
-                    handleDocumentUpload(doc.key, e.target.files?.[0])
-                  }
-                />
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input
+                    id={`document_${doc.key}`}
+                    type="file"
+                    className="form-input"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) =>
+                      handleDocumentUpload(doc.key, e.target.files?.[0])
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => openPreview(documents[doc.key], doc.label)}
+                    disabled={!documents[doc.key]}
+                  >
+                    View
+                  </button>
+                </div>
                 <div
                   style={{
                     marginTop: 6,
@@ -1089,98 +1381,124 @@ export function MultiStepApplication() {
             </div>
           </div>
           <div className="card-body">
-            <div className="space-y-4">
-              <div
-                style={{
-                  padding: 16,
-                  background: "var(--green-50)",
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <CheckCircle size={20} style={{ color: "var(--green)" }} />
-                  <div>
-                    <div style={{ fontWeight: 600 }}>All Steps Completed</div>
-                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>
-                      Your application is ready for final submission
-                    </div>
+            <div
+              style={{
+                padding: 16,
+                background: "var(--green-50)",
+                borderRadius: 12,
+                border: "1px solid rgba(34, 197, 94, 0.18)",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <CheckCircle size={20} style={{ color: "var(--green)" }} />
+                <div>
+                  <div style={{ fontWeight: 700 }}>All Steps Completed</div>
+                  <div style={{ fontSize: 13, color: "var(--gray-600)" }}>
+                    Review the application summary below before submitting.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid-2 gap-4">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  Student Info
+                </div>
+                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
+                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
+                    <div><strong>Name:</strong> {studentForm.first_name ? `${studentForm.first_name} ${studentForm.last_name || ""}` : "—"}</div>
+                    <div><strong>DOB:</strong> {studentForm.date_of_birth || "—"}</div>
+                    <div><strong>Gender:</strong> {studentForm.gender || "—"}</div>
+                    <div><strong>Phone:</strong> {studentForm.student_phone || "—"}</div>
+                    <div><strong>Email:</strong> {studentForm.student_email || "—"}</div>
                   </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: 24 }}>
-                <div
-                  style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}
-                >
-                  Application Summary
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  Parent Info
                 </div>
-                <div className="grid-2 gap-4">
-                  <div>
-                    <div style={{ fontWeight: 600 }}>
-                      {studentForm.first_name || studentForm.last_name
-                        ? `${studentForm.first_name} ${studentForm.last_name}`
-                        : "—"}
-                    </div>
+                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
+                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
+                    <div><strong>Primary Contact:</strong> {details?.parent_info?.primary_contact_person || details?.parent_info?.father_name || "—"}</div>
+                    <div><strong>Phone:</strong> {details?.parent_info?.primary_contact_phone || details?.parent_info?.father_phone || "—"}</div>
+                    <div><strong>Address:</strong> {details?.parent_info?.address || "—"}</div>
+                    <div><strong>City:</strong> {details?.parent_info?.city || "—"}</div>
+                    <div><strong>State:</strong> {details?.parent_info?.state || "—"}</div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
-                      Parent Name
-                    </div>
-                    <div style={{ fontWeight: 600 }}>
-                      {details?.parent_info?.primary_contact_person ||
-                        details?.parent_info?.father_name ||
-                        "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
-                      Previous School
-                    </div>
-                    <div style={{ fontWeight: 600 }}>
-                      {academicForm.previous_school || "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
-                      Photos Uploaded
-                    </div>
-                    <div style={{ fontWeight: 600 }}>
-                      {photos.length} file(s)
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
-                      Documents
-                    </div>
-                    <div style={{ fontWeight: 600 }}>
-                      {Object.keys(documents).length} file(s)
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: 16,
-                    fontSize: 12,
-                    color: "var(--gray-600)",
-                  }}
-                >
-                  <div>
-                    Student: {studentForm.first_name || "-"}{" "}
-                    {studentForm.last_name || "-"}
-                  </div>
-                  <div>
-                    Parent Contact:{" "}
-                    {details?.parent_info?.phone ||
-                      details?.parent_info?.primary_contact_phone ||
-                      "-"}
-                  </div>
-                  <div>Desired Class: {academicForm.desired_class || "-"}</div>
-                  <div>
-                    Marks Percentage: {academicForm.marks_percentage || "-"}
-                  </div>
-                  <div>Current Step: {progress?.current_step || step}</div>
                 </div>
               </div>
+
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  Academic Info
+                </div>
+                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
+                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
+                    <div><strong>Desired Class:</strong> {academicForm.desired_class || details?.academic_info?.desired_class || "—"}</div>
+                    <div><strong>Previous Class:</strong> {academicForm.previous_class || details?.academic_info?.previous_class || "—"}</div>
+                    <div><strong>Previous School:</strong> {academicForm.previous_school || details?.academic_info?.previous_school || "—"}</div>
+                    <div><strong>Academic Year:</strong> {academicForm.academic_year || details?.academic_info?.academic_year || details?.application?.academic_year_name || "—"}</div>
+                    <div><strong>Board:</strong> {academicForm.board_name || details?.academic_info?.board_name || "—"}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  Photos
+                </div>
+                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
+                  <div className="card-body">{renderFileList(photos, "No photos uploaded yet.")}</div>
+                </div>
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                  Documents
+                </div>
+                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
+                  <div className="card-body">{renderFileList(documents, "No documents uploaded yet.")}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewItem && (
+        <div className="modal-backdrop" onClick={() => setPreviewItem(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 860 }}>
+            <div className="modal-header">
+              <div className="modal-title">{previewItem.title || previewItem.name}</div>
+              <button className="btn btn-outline btn-sm" onClick={() => setPreviewItem(null)}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body" style={{ minHeight: 420 }}>
+              {String(previewItem.mimeType || previewItem.url || "").toLowerCase().includes("pdf") ? (
+                <iframe
+                  title={previewItem.name}
+                  src={previewItem.url}
+                  style={{ width: "100%", height: 520, border: 0, borderRadius: 12 }}
+                />
+              ) : String(previewItem.mimeType || "").toLowerCase().startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(String(previewItem.url || "")) ? (
+                <img
+                  src={previewItem.url}
+                  alt={previewItem.name}
+                  style={{ width: "100%", maxHeight: 520, objectFit: "contain", borderRadius: 12 }}
+                />
+              ) : (
+                <div style={{ padding: 24 }}>
+                  <div style={{ marginBottom: 12, fontWeight: 600 }}>{previewItem.name}</div>
+                  <a className="btn btn-primary" href={previewItem.url} target="_blank" rel="noreferrer">
+                    Open File
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>

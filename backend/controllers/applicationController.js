@@ -45,6 +45,183 @@ export const createApplication = async (req, res) => {
 };
 
 /**
+ * Create application without lead
+ * POST /api/applications/new
+ */
+export const createApplicationWithoutLead = async (req, res) => {
+  try {
+    const { academic_year_id } = req.body;
+    const { school_id } = req.user;
+
+    if (!academic_year_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: academic_year_id'
+      });
+    }
+
+    const result = await applicationService.createApplicationWithoutLead(academic_year_id, school_id);
+
+    return res.status(201).json({
+      success: true,
+      data: result,
+      message: 'Application created in manual entry mode'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create application'
+    });
+  }
+};
+
+/**
+ * Get eligible leads for creating applications
+ * GET /api/applications/eligible-leads
+ */
+export const getEligibleLeads = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const { search, limit } = req.query;
+
+    const leads = await applicationService.getEligibleLeadsForApplication(school_id, {
+      search,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: leads,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch eligible leads',
+    });
+  }
+};
+
+/**
+ * Get counts for application dashboard
+ * GET /api/applications/counts
+ */
+export const getApplicationCounts = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const counts = await applicationService.getApplicationCounts(school_id);
+
+    return res.status(200).json({
+      success: true,
+      data: counts,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch application counts',
+    });
+  }
+};
+
+/**
+ * Get applications list
+ * GET /api/applications
+ */
+export const getApplications = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const { limit, offset } = req.query;
+
+    const applications = await applicationService.getApplications(school_id, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: applications,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch applications',
+    });
+  }
+};
+
+/**
+ * Search applications list
+ * GET /api/applications/search?query=...
+ */
+export const searchApplications = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const { query, limit } = req.query;
+
+    if (!query || !String(query).trim()) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const applications = await applicationService.searchApplications(school_id, String(query).trim(), {
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: applications,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to search applications',
+    });
+  }
+};
+
+/**
+ * Get in-progress draft applications
+ * GET /api/applications/draft
+ */
+export const getDraftApplications = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const drafts = await applicationService.getDraftApplications(school_id);
+
+    return res.status(200).json({
+      success: true,
+      data: drafts,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch draft applications',
+    });
+  }
+};
+
+/**
+ * Resume an in-progress draft application
+ * GET /api/applications/:id/resume
+ */
+export const resumeApplication = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const { id } = req.params;
+
+    const result = await applicationService.resumeApplication(school_id, id);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    return res.status(404).json({
+      success: false,
+      message: error.message || 'Draft application not found',
+    });
+  }
+};
+
+/**
  * Get application progress
  * GET /api/applications/:id/progress
  */
@@ -251,9 +428,10 @@ export const saveAcademicInfo = async (req, res) => {
 export const saveDocuments = async (req, res) => {
   try {
     const { id } = req.params;
-    const { documents } = req.body;
+    const rawPayload = req.body?.payload ?? req.body;
+    const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload || {};
 
-    await applicationService.saveDocuments(id, documents);
+    await applicationService.saveDocuments(id, payload, req.files || []);
     res.json({
       success: true,
       message: 'Documents saved successfully'
@@ -296,7 +474,8 @@ export const submitApplication = async (req, res) => {
 export const getApplicationDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await applicationService.getApplicationDetails(id);
+    const { school_id } = req.user;
+    const result = await applicationService.getApplicationDetails(id, school_id);
     res.json({
       success: true,
       data: result

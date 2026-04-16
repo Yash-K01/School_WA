@@ -1,6 +1,7 @@
 import express from 'express';
 import * as applicationController from '../controllers/applicationController.js';
 import { authMiddleware } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -14,6 +15,14 @@ router.post('/start', applicationController.startAdmission);
 router.post('/save-step', applicationController.saveAdmissionStep);
 router.get('/resume/:id', applicationController.getAdmissionApplication);
 router.post('/complete', applicationController.completeAdmission);
+
+router.get('/eligible-leads', applicationController.getEligibleLeads);
+router.get('/counts', applicationController.getApplicationCounts);
+router.get('/search', applicationController.searchApplications);
+router.get('/', applicationController.getApplications);
+router.get('/draft', applicationController.getDraftApplications);
+router.get('/:id/resume', applicationController.resumeApplication);
+router.post('/new', applicationController.createApplicationWithoutLead);
 
 /**
  * POST /api/applications
@@ -55,7 +64,7 @@ router.post('/:id/academic-info', applicationController.saveAcademicInfo);
  * POST /api/applications/:id/documents
  * Save documents (Step 5)
  */
-router.post('/:id/documents', applicationController.saveDocuments);
+router.post('/:id/documents', upload.any(), applicationController.saveDocuments);
 
 /**
  * POST /api/applications/:id/submit
@@ -66,6 +75,6 @@ router.post('/:id/submit', applicationController.submitApplication);
 /**
  * Alias endpoint for compatibility with /api/admission/:id
  */
-router.get('/:id', applicationController.getAdmissionApplication);
+router.get('/:id', applicationController.getApplicationDetails);
 
 export default router;

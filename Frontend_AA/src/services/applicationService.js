@@ -1,14 +1,6 @@
 import { getAuthHeader, getUserData } from '../utils/authToken.js';
 
-const BASE_URL = '/api/admission';
-
-const STEP_TO_NUMBER = {
-  student: 1,
-  parent: 2,
-  academic: 3,
-  documents: 5,
-  review: 6,
-};
+const BASE_URL = '/api/applications';
 
 const NUMBER_TO_STEP = {
   1: 'student',
@@ -34,11 +26,15 @@ const resolveAdmissionId = (candidateId) => {
 
 const request = async (url, options = {}) => {
   const authHeaders = getAuthHeader() || {};
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const mergedHeaders = {
-    'Content-Type': 'application/json',
     ...authHeaders,
     ...(options.headers || {}),
   };
+
+  if (!isFormData) {
+    mergedHeaders['Content-Type'] = 'application/json';
+  }
 
   const response = await fetch(url, {
     ...options,
@@ -59,43 +55,128 @@ const request = async (url, options = {}) => {
  * Create a new application from a lead
  */
 export async function createApplicationFromLead(leadId, academicYearId) {
-  const data = await request(`${BASE_URL}/start`, {
+  const data = await request(`${BASE_URL}`, {
     method: 'POST',
     body: JSON.stringify({ lead_id: leadId, academic_year_id: academicYearId }),
   });
 
   return {
-    id: data.data.admission_id,
-    admission_id: data.data.admission_id,
-    current_step: STEP_TO_NUMBER[data.data.current_step] || 1,
+    id: data.data.id,
+    admission_id: data.data.id,
+    current_step: Number(data.data.current_step || 1),
     status: data.data.status,
-    resumed: Boolean(data.data.resumed),
+    resumed: false,
   };
+}
+
+export async function createApplicationWithoutLead(academicYearId) {
+  const data = await request(`${BASE_URL}/new`, {
+    method: 'POST',
+    body: JSON.stringify({ academic_year_id: academicYearId }),
+  });
+
+  return {
+    id: data.data.id,
+    admission_id: data.data.id,
+    current_step: Number(data.data.current_step || 1),
+    status: data.data.status,
+    resumed: false,
+  };
+}
+
+export async function getEligibleLeads(searchQuery = '', limit = 10) {
+  const params = new URLSearchParams();
+
+  if (searchQuery && searchQuery.trim()) {
+    params.append('search', searchQuery.trim());
+  }
+
+  if (limit) {
+    params.append('limit', String(limit));
+  }
+
+  const data = await request(`${BASE_URL}/eligible-leads?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+export async function getApplicationCounts() {
+  const data = await request(`${BASE_URL}/counts`, {
+    method: 'GET',
+  });
+
+  return data.data || {
+    total: 0,
+    submitted: 0,
+    under_review: 0,
+    approved: 0,
+    waitlisted: 0,
+    draft: 0,
+  };
+}
+
+export async function getDraftApplications() {
+  const data = await request(`${BASE_URL}/draft`, {
+    method: 'GET',
+  });
+
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+export async function getApplications({ limit = 100, offset = 0 } = {}) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  const data = await request(`${BASE_URL}?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+export async function searchApplications(queryText, limit = 100) {
+  if (!queryText || !String(queryText).trim()) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    query: String(queryText).trim(),
+    limit: String(limit),
+  });
+
+  const data = await request(`${BASE_URL}/search?${params.toString()}`, {
+    method: 'GET',
+  });
+
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+export async function resumeDraftApplication(applicationId) {
+  const data = await request(`${BASE_URL}/${applicationId}/resume`, {
+    method: 'GET',
+  });
+
+  return data.data;
 }
 
 /**
  * Get application progress and step status
  */
 export async function getApplicationProgress(applicationId) {
-  const data = await request(`${BASE_URL}/${applicationId}`, {
+  const data = await request(`${BASE_URL}/${applicationId}/progress`, {
     method: 'GET',
   });
 
-  const currentStepKey = data?.data?.admission?.current_step || data?.data?.current_step || 'student';
-  const currentStep = STEP_TO_NUMBER[currentStepKey] || 1;
+  const currentStep = Number(data?.data?.current_step || 1);
 
   return {
     current_step: currentStep,
-    current_step_key: currentStepKey,
-    status: data?.data?.admission?.status,
-    steps: {
-      student_info: currentStep > 1 ? 'completed' : 'pending',
-      parent_info: currentStep > 2 ? 'completed' : 'pending',
-      academic_info: currentStep > 3 ? 'completed' : 'pending',
-      photos: currentStep > 4 ? 'completed' : 'pending',
-      documents: currentStep > 5 ? 'completed' : 'pending',
-      review: data?.data?.admission?.is_completed ? 'completed' : 'pending',
-    },
+    status: data?.data?.status,
+    steps: data?.data?.steps || {},
   };
 }
 
@@ -103,19 +184,33 @@ export async function getApplicationProgress(applicationId) {
  * Get application details for prefill
  */
 export async function getApplicationDetails(applicationId) {
-  const data = await request(`${BASE_URL}/${applicationId}`, {
-    method: 'GET',
-  });
+  try {
+    const data = await request(`${BASE_URL}/${applicationId}/details`, {
+      method: 'GET',
+    });
 
-  return {
-    application: data.data.admission,
-    student_info: data.data.student || {},
-    parent_info: data.data.parent || {},
-    academic_info: data.data.academic || {},
-    photos: data.data.photos || {},
-    documents: data.data.documents || {},
-    current_step: data.data.current_step,
-  };
+    return {
+      application: data.data.application || data.data.admission,
+      student_info: data.data.student_info || data.data.student || {},
+      parent_info: data.data.parent_info || data.data.parent || {},
+      academic_info: data.data.academic_info || data.data.academic || {},
+      photos: data.data.photos || {},
+      documents: data.data.documents || {},
+      current_step: data.data.application?.current_step,
+    };
+  } catch (error) {
+    console.warn('Falling back to empty application details:', error.message);
+
+    return {
+      application: { id: Number(applicationId) || applicationId, current_step: 1 },
+      student_info: {},
+      parent_info: {},
+      academic_info: {},
+      photos: {},
+      documents: {},
+      current_step: 1,
+    };
+  }
 }
 
 /**
@@ -127,13 +222,9 @@ export async function saveStudentInfo(applicationId, studentData) {
     throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
   }
 
-  return request(`${BASE_URL}/save-step`, {
+  return request(`${BASE_URL}/${admissionId}/student-info`, {
     method: 'POST',
-    body: JSON.stringify({
-      admission_id: admissionId,
-      step: 'student',
-      data: studentData,
-    }),
+    body: JSON.stringify(studentData),
   });
 }
 
@@ -146,13 +237,9 @@ export async function saveParentInfo(applicationId, parentData) {
     throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
   }
 
-  return request(`${BASE_URL}/save-step`, {
+  return request(`${BASE_URL}/${admissionId}/parent-info`, {
     method: 'POST',
-    body: JSON.stringify({
-      admission_id: admissionId,
-      step: 'parent',
-      data: parentData,
-    }),
+    body: JSON.stringify(parentData),
   });
 }
 
@@ -200,13 +287,23 @@ export async function saveDocuments(applicationId, documents) {
     throw new Error('Admission ID is missing. Please restart the application flow from Create Application.');
   }
 
-  return request(`${BASE_URL}/save-step`, {
+  const payload = documents || {};
+  const formData = new FormData();
+  formData.append('payload', JSON.stringify(payload));
+
+  const appendFile = (prefix, type, entry) => {
+    const file = entry?.file;
+    if (file instanceof File) {
+      formData.append(`${prefix}_${type}`, file, file.name);
+    }
+  };
+
+  Object.entries(payload.photos || {}).forEach(([type, entry]) => appendFile('photo', type, entry));
+  Object.entries(payload.documents || {}).forEach(([type, entry]) => appendFile('document', type, entry));
+
+  return request(`${BASE_URL}/${admissionId}/documents`, {
     method: 'POST',
-    body: JSON.stringify({
-      admission_id: admissionId,
-      step: 'documents',
-      data: documents,
-    }),
+    body: formData,
   });
 }
 
@@ -214,9 +311,8 @@ export async function saveDocuments(applicationId, documents) {
  * Submit application (Step 6 - Final)
  */
 export async function submitApplication(applicationId) {
-  return request(`${BASE_URL}/complete`, {
+  return request(`${BASE_URL}/${applicationId}/submit`, {
     method: 'POST',
-    body: JSON.stringify({ admission_id: applicationId }),
   });
 }
 

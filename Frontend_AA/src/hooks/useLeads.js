@@ -5,12 +5,13 @@
 
 import { useState, useEffect } from 'react'
 import { getAuthHeader } from '../utils/authToken.js'
+import { getEligibleLeads } from '../services/applicationService.js'
 
 /**
  * Hook to fetch and search leads
  * Returns: { leads, loading, error }
  */
-export function useLeads(searchQuery = '') {
+export function useLeads(searchQuery = '', excludeSubmitted = false) {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -21,12 +22,17 @@ export function useLeads(searchQuery = '') {
         setLoading(true)
         setError(null)
 
-        // Build query parameters
+        if (excludeSubmitted) {
+          const eligible = await getEligibleLeads(searchQuery, 10)
+          setLeads(eligible)
+          return
+        }
+
         const params = new URLSearchParams()
         if (searchQuery && searchQuery.trim().length >= 2) {
           params.append('search', searchQuery)
         } else if (!searchQuery) {
-          params.append('limit', '10') // Get 10 recent leads if no search
+          params.append('limit', '10')
         }
 
         const response = await fetch(`/api/leads?${params.toString()}`, {
@@ -56,7 +62,7 @@ export function useLeads(searchQuery = '') {
     // Debounce search
     const timer = setTimeout(fetchLeads, searchQuery ? 300 : 0)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, excludeSubmitted])
 
   return { leads, loading, error }
 }

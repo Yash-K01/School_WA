@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Search, Loader } from "lucide-react";
 import { useLeads } from "../hooks/useLeads";
-import { createApplicationFromLead } from "../services/applicationService";
+import {
+  createApplicationFromLead,
+  createApplicationWithoutLead,
+} from "../services/applicationService";
 import "../style.css";
 
 /**
@@ -20,7 +23,7 @@ export function CreateApplication() {
   const [selected, setSelected] = useState(null);
 
   // Fetch leads based on search query
-  const { leads, loading, error } = useLeads(search);
+  const { leads, loading, error } = useLeads(search, true);
 
   // State for application configuration
   const [form, setForm] = useState({
@@ -37,29 +40,25 @@ export function CreateApplication() {
     setStep("confirm");
   };
 
+  const handleCreateWithoutLead = () => {
+    setSelected(null);
+    setStep("confirm");
+  };
+
   // Handle application creation
   const handleCreateApplication = async () => {
     try {
       setCreating(true);
       setCreateError("");
 
-      if (!selected || !selected.id) {
-        setCreateError("Please select a lead");
-        return;
-      }
-
       if (!form.year) {
         setCreateError("Please select an academic year");
         return;
       }
 
-      console.log("📝 Creating application for lead:", selected.id);
-
-      // Create application via API
-      const result = await createApplicationFromLead(
-        selected.id,
-        parseInt(form.year),
-      );
+      const result = selected?.id
+        ? await createApplicationFromLead(selected.id, parseInt(form.year, 10))
+        : await createApplicationWithoutLead(parseInt(form.year, 10));
 
       console.log("✅ Application created with ID:", result.id);
 
@@ -69,6 +68,7 @@ export function CreateApplication() {
       navigate(`/applications/form/${result.id}`, {
         state: {
           lead: selected,
+          manualEntryMode: !selected,
           academicYear: form.year,
           admissionType: form.type,
           resumed: result.resumed,
@@ -90,7 +90,9 @@ export function CreateApplication() {
           <ArrowLeft size={16} /> Back to Applications
         </button>
         <h1 className="page-title mb-1">Create New Application</h1>
-        <p className="page-sub mb-5">Select an existing lead to begin</p>
+        <p className="page-sub mb-5">
+          Select an eligible lead or start a manual application
+        </p>
 
         {/* Search and error handling */}
         <div className="card mb-5">
@@ -105,6 +107,13 @@ export function CreateApplication() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateWithoutLead}
+              >
+                <FileText size={14} /> New Application
+              </button>
             </div>
             {error && (
               <div style={{ marginTop: 12, fontSize: 13, color: "var(--red)" }}>
@@ -204,7 +213,7 @@ export function CreateApplication() {
         className="space-y-4"
       >
         {/* Selected Lead Summary */}
-        {selected && (
+        {selected ? (
           <div className="card" style={{ border: "2px solid var(--primary)" }}>
             <div className="card-header">
               <div className="card-title">Selected Lead</div>
@@ -239,6 +248,18 @@ export function CreateApplication() {
                   </div>
                   <div style={{ fontWeight: 600 }}>{selected.email || "—"}</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card" style={{ border: "2px solid var(--blue)" }}>
+            <div className="card-header">
+              <div className="card-title">Manual Entry Mode</div>
+            </div>
+            <div className="card-body">
+              <div style={{ fontSize: 14, color: "var(--gray-600)" }}>
+                No lead is attached. Student and parent details will be entered
+                manually in the form.
               </div>
             </div>
           </div>

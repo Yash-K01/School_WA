@@ -32,7 +32,7 @@ const contactOptions = [
   { label: "Guardian", value: "Guardian" },
 ];
 
-export default function ParentForm({ applicationId, lead, onSuccess }) {
+export default function ParentForm({ applicationId, lead, initialData, onSuccess }) {
   const [form, setForm] = useState(initialState);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -48,6 +48,37 @@ export default function ParentForm({ applicationId, lead, onSuccess }) {
       }));
     }
   }, [lead]);
+
+  useEffect(() => {
+    if (initialData) {
+      setForm((f) => ({
+        ...f,
+        fatherName: initialData.father_name || initialData.fatherName || f.fatherName,
+        fatherPhone: initialData.father_phone || initialData.fatherPhone || f.fatherPhone,
+        fatherEmail: initialData.father_email || initialData.fatherEmail || f.fatherEmail,
+        fatherOccupation: initialData.father_occupation || initialData.fatherOccupation || f.fatherOccupation,
+        motherName: initialData.mother_name || initialData.motherName || f.motherName,
+        motherPhone: initialData.mother_phone || initialData.motherPhone || f.motherPhone,
+        motherEmail: initialData.mother_email || initialData.motherEmail || f.motherEmail,
+        motherOccupation: initialData.mother_occupation || initialData.motherOccupation || f.motherOccupation,
+        guardianName: initialData.guardian_name || initialData.guardianName || f.guardianName,
+        guardianRelation: initialData.guardian_relation || initialData.guardianRelation || f.guardianRelation,
+        guardianPhone: initialData.guardian_phone || initialData.guardianPhone || f.guardianPhone,
+        guardianEmail: initialData.guardian_email || initialData.guardianEmail || f.guardianEmail,
+        primaryContactPerson:
+          initialData.primary_contact_person || initialData.primaryContactPerson || f.primaryContactPerson,
+        primaryContactRelation:
+          initialData.primary_contact_relation || initialData.primaryContactRelation || f.primaryContactRelation,
+        primaryContactPhone:
+          initialData.primary_contact_phone || initialData.primaryContactPhone || f.primaryContactPhone,
+        address: initialData.address || f.address,
+        city: initialData.city || f.city,
+        state: initialData.state || f.state,
+        postalCode: initialData.postal_code || initialData.postalCode || f.postalCode,
+        incomeRange: initialData.income_range || initialData.incomeRange || f.incomeRange,
+      }));
+    }
+  }, [initialData]);
 
   // Validation logic
   const validate = () => {
@@ -313,5 +344,6 @@ ParentForm.propTypes = {
   applicationId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     .isRequired,
   lead: PropTypes.object,
+  initialData: PropTypes.object,
   onSuccess: PropTypes.func,
 };

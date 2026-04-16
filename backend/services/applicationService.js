@@ -1,4 +1,140 @@
+import path from 'path';
 import pool from '../config/db.js';
+
+const APPLICATION_PHOTO_TYPES = ['student_photo', 'passport_photos'];
+const APPLICATION_DOCUMENT_TYPES = [
+  'birth_certificate',
+  'aadhaar_card',
+  'passport_photos',
+  'transfer_certificate',
+  'previous_report_card',
+  'address_proof',
+  'parent_id_proof',
+];
+
+const toPublicFilePath = (filePathOrName) => {
+  if (!filePathOrName) {
+    return null;
+  }
+
+  const filePath = String(filePathOrName);
+  if (filePath.startsWith('/uploads/')) {
+    return filePath;
+  }
+
+  return `/uploads/${path.basename(filePath)}`;
+};
+
+const normalizeFileRecord = (record) => {
+  if (!record) {
+    return null;
+  }
+
+  if (typeof record === 'string') {
+    const filePath = toPublicFilePath(record);
+    return {
+      file_name: path.basename(record),
+      file_path: filePath,
+      file_url: filePath,
+      file_size: null,
+      mime_type: null,
+      created_at: null,
+      updated_at: null,
+    };
+  }
+
+  if (typeof record !== 'object') {
+    return null;
+  }
+
+  const filePath = record.file_path || record.file_url || record.path || record.url || null;
+  const publicPath = toPublicFilePath(filePath || record.file_name);
+
+  return {
+    ...record,
+    file_name: record.file_name || record.name || (filePath ? path.basename(String(filePath)) : null),
+    file_path: publicPath,
+    file_url: publicPath,
+  };
+};
+
+const ensureApplicationFileConstraints = async (client) => {
+  await client.query(`
+    ALTER TABLE application_documents
+      ADD COLUMN IF NOT EXISTS file_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  await client.query(`
+    ALTER TABLE application_photos
+      ADD COLUMN IF NOT EXISTS file_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  await client.query(`
+    WITH ranked AS (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY application_id, document_type
+               ORDER BY updated_at DESC NULLS LAST,
+                        created_at DESC NULLS LAST,
+                        id DESC
+             ) AS rn
+      FROM application_documents
+    )
+    DELETE FROM application_documents d
+    USING ranked r
+    WHERE d.id = r.id
+      AND r.rn > 1
+  `);
+
+  await client.query(`
+    WITH ranked AS (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY application_id, photo_type
+               ORDER BY updated_at DESC NULLS LAST,
+                        created_at DESC NULLS LAST,
+                        id DESC
+             ) AS rn
+      FROM application_photos
+    )
+    DELETE FROM application_photos p
+    USING ranked r
+    WHERE p.id = r.id
+      AND r.rn > 1
+  `);
+
+  await client.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'unique_application_documents_application_document_type'
+          AND conrelid = 'application_documents'::regclass
+      ) THEN
+        ALTER TABLE application_documents
+          ADD CONSTRAINT unique_application_documents_application_document_type UNIQUE (application_id, document_type);
+      END IF;
+    END $$;
+  `);
+
+  await client.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'unique_application_photos_application_photo_type'
+          AND conrelid = 'application_photos'::regclass
+      ) THEN
+        ALTER TABLE application_photos
+          ADD CONSTRAINT unique_application_photos_application_photo_type UNIQUE (application_id, photo_type);
+      END IF;
+    END $$;
+  `);
+};
 
 /**
  * Create a new application from lead
@@ -19,9 +155,24 @@ export const createApplication = async (leadId, academicYearId, schoolId) => {
     await client.query('BEGIN');
 
     // Verify lead exists
-    const leadCheck = await client.query('SELECT id FROM lead WHERE id = $1', [leadId]);
+    const leadCheck = await client.query('SELECT id FROM lead WHERE id = $1 AND school_id = $2', [leadId, schoolId]);
     if (leadCheck.rows.length === 0) {
       throw new Error(`Lead with ID ${leadId} not found`);
+    }
+
+    // Prevent creating a new application when a submitted application already exists for this lead.
+    const submittedCheck = await client.query(
+      `SELECT id
+       FROM application
+       WHERE school_id = $1
+         AND lead_id = $2
+         AND status = 'submitted'
+       LIMIT 1`,
+      [schoolId, leadId],
+    );
+
+    if (submittedCheck.rows.length > 0) {
+      throw new Error('A submitted application already exists for this lead');
     }
 
     // Verify academic year exists
@@ -66,6 +217,213 @@ export const createApplication = async (leadId, academicYearId, schoolId) => {
       client.release();
     }
   }
+};
+
+export const createApplicationWithoutLead = async (academicYearId, schoolId) => {
+  let client;
+  try {
+    if (!academicYearId || !schoolId) {
+      throw new Error(`Missing required fields: academicYearId=${academicYearId}, schoolId=${schoolId}`);
+    }
+
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const yearCheck = await client.query(
+      'SELECT id FROM academic_year WHERE id = $1 AND school_id = $2',
+      [academicYearId, schoolId],
+    );
+    if (yearCheck.rows.length === 0) {
+      throw new Error(`Academic year with ID ${academicYearId} not found`);
+    }
+
+    const appNumber = `APP-${new Date().getFullYear()}-${Date.now()}`;
+
+    const result = await client.query(
+      `INSERT INTO application (school_id, lead_id, academic_year_id, application_number, current_step, status)
+       VALUES ($1, NULL, $2, $3, 1, 'in_progress')
+       RETURNING id, lead_id, current_step, status, created_at`,
+      [schoolId, academicYearId, appNumber],
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+    throw new Error(`Failed to create application: ${error.message}`);
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+};
+
+export const getApplicationCounts = async (schoolId) => {
+  const result = await pool.query(
+    `SELECT
+       COUNT(*) AS total,
+       COUNT(*) FILTER (WHERE status = 'submitted') AS submitted,
+       COUNT(*) FILTER (WHERE status = 'under_review') AS under_review,
+       COUNT(*) FILTER (WHERE status = 'approved') AS approved,
+       COUNT(*) FILTER (WHERE status = 'waitlisted') AS waitlisted,
+       COUNT(*) FILTER (WHERE status = 'in_progress') AS draft
+     FROM application
+     WHERE school_id = $1`,
+    [schoolId],
+  );
+
+  const row = result.rows[0] || {};
+  return {
+    total: Number(row.total || 0),
+    submitted: Number(row.submitted || 0),
+    under_review: Number(row.under_review || 0),
+    approved: Number(row.approved || 0),
+    waitlisted: Number(row.waitlisted || 0),
+    draft: Number(row.draft || 0),
+  };
+};
+
+export const getDraftApplications = async (schoolId) => {
+  const result = await pool.query(
+    `SELECT
+       a.id,
+       TRIM(CONCAT(COALESCE(asi.first_name, ''), ' ', COALESCE(asi.last_name, ''))) AS student_name,
+       a.current_step,
+       a.updated_at,
+       a.status
+     FROM application a
+     LEFT JOIN application_student_info asi ON asi.application_id = a.id
+     WHERE school_id = $1
+       AND status = 'in_progress'
+     ORDER BY updated_at DESC`,
+    [schoolId],
+  );
+
+  return result.rows;
+};
+
+export const getApplications = async (schoolId, options = {}) => {
+  const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 100;
+  const offset = Number.isInteger(options.offset) && options.offset >= 0 ? options.offset : 0;
+
+  const result = await pool.query(
+    `SELECT
+       a.id,
+       a.application_number,
+       a.status,
+       a.current_step,
+       a.updated_at,
+       a.submitted_at,
+       CONCAT(COALESCE(asi.first_name, l.first_name, ''), ' ', COALESCE(asi.last_name, l.last_name, '')) AS student_name,
+       COALESCE(aai.desired_class, l.desired_class) AS grade,
+       COALESCE(api.primary_contact_phone, api.father_phone, l.phone) AS parent_contact
+     FROM application a
+     LEFT JOIN application_student_info asi ON asi.application_id = a.id
+     LEFT JOIN application_parent_info api ON api.application_id = a.id
+     LEFT JOIN application_academic_info aai ON aai.application_id = a.id
+     LEFT JOIN lead l ON l.id = a.lead_id
+     WHERE a.school_id = $1
+     ORDER BY a.updated_at DESC
+     LIMIT $2 OFFSET $3`,
+    [schoolId, limit, offset],
+  );
+
+  return result.rows;
+};
+
+export const searchApplications = async (schoolId, queryText, options = {}) => {
+  const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 100;
+
+  const result = await pool.query(
+    `SELECT
+       a.id,
+       a.application_number,
+       a.status,
+       a.current_step,
+       a.updated_at,
+       a.submitted_at,
+       CONCAT(COALESCE(asi.first_name, l.first_name, ''), ' ', COALESCE(asi.last_name, l.last_name, '')) AS student_name,
+       COALESCE(aai.desired_class, l.desired_class) AS grade,
+       COALESCE(api.primary_contact_phone, api.father_phone, l.phone) AS parent_contact
+     FROM application a
+     LEFT JOIN application_student_info asi ON asi.application_id = a.id
+     LEFT JOIN application_parent_info api ON api.application_id = a.id
+     LEFT JOIN application_academic_info aai ON aai.application_id = a.id
+     LEFT JOIN lead l ON l.id = a.lead_id
+     WHERE a.school_id = $1
+       AND (
+         CAST(a.id AS TEXT) ILIKE $2
+         OR a.application_number ILIKE $2
+         OR CONCAT(COALESCE(asi.first_name, l.first_name, ''), ' ', COALESCE(asi.last_name, l.last_name, '')) ILIKE $2
+         OR COALESCE(api.primary_contact_phone, api.father_phone, l.phone, '') ILIKE $2
+       )
+     ORDER BY a.updated_at DESC
+     LIMIT $3`,
+    [schoolId, `%${queryText}%`, limit],
+  );
+
+  return result.rows;
+};
+
+export const getEligibleLeadsForApplication = async (schoolId, filters = {}) => {
+  const { search, limit } = filters;
+  const params = [schoolId];
+
+  let query = `
+    SELECT l.*
+    FROM lead l
+    WHERE l.school_id = $1
+      AND NOT EXISTS (
+        SELECT 1
+        FROM application a
+        WHERE a.lead_id = l.id
+          AND a.status = 'submitted'
+      )
+  `;
+
+  if (search) {
+    params.push(`%${search}%`);
+    query += `
+      AND (
+        l.first_name ILIKE $${params.length}
+        OR l.last_name ILIKE $${params.length}
+        OR CONCAT(COALESCE(l.first_name, ''), ' ', COALESCE(l.last_name, '')) ILIKE $${params.length}
+        OR l.email ILIKE $${params.length}
+        OR l.phone ILIKE $${params.length}
+      )
+    `;
+  }
+
+  query += ' ORDER BY l.created_at DESC';
+
+  if (Number.isInteger(limit) && limit > 0) {
+    params.push(limit);
+    query += ` LIMIT $${params.length}`;
+  }
+
+  const result = await pool.query(query, params);
+  return result.rows;
+};
+
+export const resumeApplication = async (schoolId, applicationId) => {
+  const query = `
+    SELECT a.id, a.school_id, a.lead_id, a.academic_year_id, a.current_step, a.status, a.updated_at
+    FROM application a
+    WHERE a.school_id = $1
+      AND a.id = $2
+      AND a.status = 'in_progress'
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [schoolId, applicationId]);
+
+  if (!result.rows.length) {
+    throw new Error('Draft application not found');
+  }
+
+  return result.rows[0];
 };
 
 /**
@@ -283,7 +641,7 @@ export const saveAcademicInfo = async (applicationId, schoolId, academicData) =>
 
     await client.query('BEGIN');
 
-    let targetApplicationId = Number(applicationId);
+    const targetApplicationId = Number(applicationId);
     console.log(`📝 Saving Academic Info for App: ${targetApplicationId}`);
 
     const appCheck = await client.query(
@@ -292,40 +650,7 @@ export const saveAcademicInfo = async (applicationId, schoolId, academicData) =>
     );
 
     if (!appCheck.rows.length) {
-      const admissionCheck = await client.query(
-        `SELECT id, lead_id, academic_year_id, application_id
-         FROM admission
-         WHERE id = $1 AND school_id = $2`,
-        [targetApplicationId, schoolId],
-      );
-
-      if (!admissionCheck.rows.length) {
-        throw new Error('Invalid application_id or school_id');
-      }
-
-      const admissionRow = admissionCheck.rows[0];
-
-      if (admissionRow.application_id) {
-        targetApplicationId = Number(admissionRow.application_id);
-      } else {
-        const appNumber = `APP-${new Date().getFullYear()}-${Date.now()}`;
-        const appInsert = await client.query(
-          `INSERT INTO application (school_id, lead_id, academic_year_id, application_number, current_step, status)
-           VALUES ($1, $2, $3, $4, 3, 'in_progress')
-           RETURNING id`,
-          [schoolId, admissionRow.lead_id || null, admissionRow.academic_year_id, appNumber],
-        );
-
-        targetApplicationId = Number(appInsert.rows[0].id);
-
-        await client.query(
-          `UPDATE admission
-           SET application_id = $1,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $2 AND school_id = $3`,
-          [targetApplicationId, admissionRow.id, schoolId],
-        );
-      }
+      throw new Error('Invalid application_id or school_id');
     }
 
     const query = `
@@ -386,53 +711,154 @@ export const saveAcademicInfo = async (applicationId, schoolId, academicData) =>
  * Save documents (Step 5)
  * POST /api/applications/:id/documents
  */
-export const saveDocuments = async (applicationId, documents) => {
+export const saveDocuments = async (applicationId, payload = {}, uploadedFiles = []) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Keep one latest document row per application and upsert it on application_id.
-    const latestDoc = Array.isArray(documents) && documents.length > 0
-      ? documents[documents.length - 1]
-      : null;
+    console.log('applicationId:', applicationId);
+    console.log('documents payload type:', typeof payload);
 
-    if (latestDoc) {
-      const fileName = latestDoc.file_name || latestDoc.file_path?.split('/').pop() || 'document';
+    const resolvedApplicationId = Number(applicationId);
+    if (!Number.isInteger(resolvedApplicationId) || resolvedApplicationId <= 0) {
+      throw new Error('Valid applicationId is required');
+    }
+
+    const applicationCheck = await client.query(
+      'SELECT id FROM application WHERE id = $1',
+      [resolvedApplicationId],
+    );
+
+    if (!applicationCheck.rows.length) {
+      throw new Error('Application Not Found');
+    }
+
+    await ensureApplicationFileConstraints(client);
+
+    const uploadedFileMap = new Map(
+      (Array.isArray(uploadedFiles) ? uploadedFiles : []).map((file) => [file.fieldname, file]),
+    );
+
+    const stage = String(payload.stage || 'all').toLowerCase();
+    const photosPayload = payload.photos && typeof payload.photos === 'object' ? payload.photos : {};
+    const documentsPayload = payload.documents && typeof payload.documents === 'object' ? payload.documents : {};
+
+    const resolveUploadedFile = (fieldName) => {
+      const file = uploadedFileMap.get(fieldName);
+      if (!file) {
+        return null;
+      }
+
+      return {
+        file_name: file.originalname,
+        file_path: toPublicFilePath(file.filename),
+        file_size: file.size,
+        mime_type: file.mimetype,
+      };
+    };
+
+    const resolveExistingFile = (value) => {
+      const normalized = normalizeFileRecord(value);
+      if (!normalized) {
+        return null;
+      }
+
+      return {
+        file_name: normalized.file_name,
+        file_path: normalized.file_path,
+        file_size: normalized.file_size ?? null,
+        mime_type: normalized.mime_type ?? null,
+      };
+    };
+
+    const upsertApplicationPhoto = async (photoType, value) => {
+      const uploaded = resolveUploadedFile(`photo_${photoType}`) || resolveUploadedFile(photoType);
+      const existing = uploaded || resolveExistingFile(value);
+
+      if (!existing?.file_path) {
+        return;
+      }
+
       await client.query(
-        `INSERT INTO application_documents
-         (application_id, document_type, file_name, file_path, file_size, mime_type)
+        `INSERT INTO application_photos
+         (application_id, photo_type, file_name, file_path, file_size, mime_type)
          VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (application_id) DO UPDATE
-         SET document_type = EXCLUDED.document_type,
-             file_name = EXCLUDED.file_name,
+         ON CONFLICT (application_id, photo_type) DO UPDATE
+         SET file_name = EXCLUDED.file_name,
              file_path = EXCLUDED.file_path,
              file_size = EXCLUDED.file_size,
              mime_type = EXCLUDED.mime_type,
              updated_at = CURRENT_TIMESTAMP`,
         [
-          applicationId,
-          latestDoc.document_type,
-          fileName,
-          latestDoc.file_path || '',
-          latestDoc.file_size || null,
-          latestDoc.mime_type || null
-        ]
+          resolvedApplicationId,
+          photoType,
+          existing.file_name || path.basename(existing.file_path),
+          existing.file_path,
+          existing.file_size || null,
+          existing.mime_type || null,
+        ],
       );
-    } else {
+    };
+
+    const upsertApplicationDocument = async (documentType, value) => {
+      const uploaded = resolveUploadedFile(`document_${documentType}`) || resolveUploadedFile(documentType);
+      const existing = uploaded || resolveExistingFile(value);
+
+      if (!existing?.file_path) {
+        return;
+      }
+
       await client.query(
-        `DELETE FROM application_documents WHERE application_id = $1`,
-        [applicationId]
+        `INSERT INTO application_documents
+         (application_id, document_type, file_name, file_path, file_size, mime_type)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (application_id, document_type) DO UPDATE
+         SET file_name = EXCLUDED.file_name,
+             file_path = EXCLUDED.file_path,
+             file_size = EXCLUDED.file_size,
+             mime_type = EXCLUDED.mime_type,
+             updated_at = CURRENT_TIMESTAMP`,
+        [
+          resolvedApplicationId,
+          documentType,
+          existing.file_name || path.basename(existing.file_path),
+          existing.file_path,
+          existing.file_size || null,
+          existing.mime_type || null,
+        ],
+      );
+    };
+
+    if (stage === 'photos' || stage === 'all') {
+      for (const photoType of APPLICATION_PHOTO_TYPES) {
+        await upsertApplicationPhoto(photoType, photosPayload[photoType]);
+      }
+
+      await client.query(
+        `UPDATE application
+         SET current_step = GREATEST(current_step, 5),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [resolvedApplicationId],
       );
     }
 
-    // Advance current_step to 6
-    await client.query(
-      `UPDATE application SET current_step = GREATEST(current_step, 6), updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [applicationId]
-    );
+    if (stage === 'documents' || stage === 'all') {
+      for (const documentType of APPLICATION_DOCUMENT_TYPES) {
+        await upsertApplicationDocument(documentType, documentsPayload[documentType]);
+      }
+
+      await client.query(
+        `UPDATE application
+         SET current_step = GREATEST(current_step, 6),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [resolvedApplicationId],
+      );
+    }
 
     await client.query('COMMIT');
-    return { success: true, message: 'Documents saved' };
+    return { success: true, message: 'Application files saved' };
   } catch (error) {
     await client.query('ROLLBACK');
     throw new Error(`Failed to save documents: ${error.message}`);
@@ -470,30 +896,73 @@ export const submitApplication = async (applicationId) => {
 /**
  * Get application details for prefill
  */
-export const getApplicationDetails = async (applicationId) => {
+export const getApplicationDetails = async (applicationId, schoolId) => {
   try {
     const appQuery = `
-      SELECT a.*, l.first_name, l.last_name, l.email, l.phone, l.desired_class
+      SELECT
+        a.*,
+        ay.year_name AS academic_year_name,
+        l.first_name AS lead_first_name,
+        l.last_name AS lead_last_name,
+        l.email AS lead_email,
+        l.phone AS lead_phone,
+        l.desired_class AS lead_desired_class
       FROM application a
+      LEFT JOIN academic_year ay ON ay.id = a.academic_year_id
       LEFT JOIN lead l ON a.lead_id = l.id
       WHERE a.id = $1
+      ${schoolId ? 'AND a.school_id = $2' : ''}
+      LIMIT 1
     `;
-    const app = await pool.query(appQuery, [applicationId]);
+    const app = await pool.query(appQuery, schoolId ? [applicationId, schoolId] : [applicationId]);
 
-    const studentQuery = `SELECT * FROM application_student_info WHERE application_id = $1`;
-    const student = await pool.query(studentQuery, [applicationId]);
+    if (!app.rows.length) {
+      throw new Error('Application not found');
+    }
 
-    const parentQuery = `SELECT * FROM application_parent_info WHERE application_id = $1`;
-    const parent = await pool.query(parentQuery, [applicationId]);
+    const studentQuery = `SELECT * FROM application_student_info WHERE application_id = $1 LIMIT 1`;
+    const parentQuery = `SELECT * FROM application_parent_info WHERE application_id = $1 LIMIT 1`;
+    const academicQuery = `SELECT * FROM application_academic_info WHERE application_id = $1 LIMIT 1`;
+    const photosQuery = `
+      SELECT *
+      FROM application_photos
+      WHERE application_id = $1
+      ORDER BY created_at DESC, id DESC
+    `;
+    const documentsQuery = `
+      SELECT *
+      FROM application_documents
+      WHERE application_id = $1
+      ORDER BY created_at DESC, id DESC
+    `;
 
-    const academicQuery = `SELECT * FROM application_academic_info WHERE application_id = $1`;
-    const academic = await pool.query(academicQuery, [applicationId]);
+    const lookupParams = [applicationId];
+
+    const [student, parent, academic, photos, documents] = await Promise.all([
+      pool.query(studentQuery, lookupParams),
+      pool.query(parentQuery, lookupParams),
+      pool.query(academicQuery, lookupParams),
+      pool.query(photosQuery, lookupParams),
+      pool.query(documentsQuery, lookupParams),
+    ]);
+
+    const photoMap = photos.rows.reduce((accumulator, row) => {
+      accumulator[row.photo_type] = normalizeFileRecord(row);
+      return accumulator;
+    }, {});
+
+    const documentMap = documents.rows.reduce((accumulator, row) => {
+      accumulator[row.document_type] = normalizeFileRecord(row);
+      return accumulator;
+    }, {});
 
     return {
       application: app.rows[0],
       student_info: student.rows[0] || {},
       parent_info: parent.rows[0] || {},
-      academic_info: academic.rows[0] || {}
+      academic_info: academic.rows[0] || {},
+      photos: photoMap,
+      documents: documentMap,
     };
   } catch (error) {
     throw new Error(`Failed to get application details: ${error.message}`);

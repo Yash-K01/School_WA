@@ -3,10 +3,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Eye, Download } from "lucide-react";
 import {
-  getAdmissionStats,
-  getAdmissions,
-  searchAdmissions,
-} from "../services/admissionService";
+  getApplications,
+  searchApplications,
+  getApplicationCounts,
+  getDraftApplications,
+  resumeDraftApplication,
+} from "../services/applicationService";
 import "../style.css";
 
 const statusMap = {
@@ -15,6 +17,8 @@ const statusMap = {
   approved: { label: "Approved", cls: "badge-green" },
   rejected: { label: "Rejected", cls: "badge-red" },
   waitlisted: { label: "Waitlisted", cls: "badge-purple" },
+  in_progress: { label: "Draft", cls: "badge-gray" },
+  draft: { label: "Draft", cls: "badge-gray" },
 };
 
 export function Applications() {
@@ -28,9 +32,12 @@ export function Applications() {
     approved: 0,
     rejected: 0,
     waitlisted: 0,
+    draft: 0,
   });
   const [applications, setApplications] = useState([]);
   const [filteredApps, setFilteredApps] = useState([]);
+  const [draftApplications, setDraftApplications] = useState([]);
+  const [showDrafts, setShowDrafts] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -46,17 +53,16 @@ export function Applications() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch stats
-        const statsData = await getAdmissionStats();
+        const [statsData, draftsData, admissionsData] = await Promise.all([
+          getApplicationCounts(),
+          getDraftApplications(),
+          getApplications({ limit: 100, offset: 0 }),
+        ]);
+
         setStats(statsData);
+        setDraftApplications(draftsData);
 
-        // Fetch admissions
-        const admissionsData = await getAdmissions({ limit: 100, offset: 0 });
-
-        // Handle both array and object responses
-        const appsList = Array.isArray(admissionsData)
-          ? admissionsData
-          : admissionsData?.applications || admissionsData?.data || [];
+        const appsList = Array.isArray(admissionsData) ? admissionsData : [];
 
         setApplications(appsList);
         setFilteredApps(appsList);
@@ -83,10 +89,7 @@ export function Applications() {
     }
 
     try {
-      const results = await searchAdmissions(value);
-      const searchResults = Array.isArray(results)
-        ? results
-        : results?.applications || [];
+      const searchResults = await searchApplications(value);
       applyFilter(searchResults, filter);
     } catch (err) {
       setSearchError(err.message);
@@ -115,7 +118,16 @@ export function Applications() {
 
   // Handle view application
   const handleViewApplication = (appId) => {
-    navigate(`/applications/${appId}`);
+    navigate(`/application/${appId}`);
+  };
+
+  const handleResumeDraft = async (appId) => {
+    try {
+      await resumeDraftApplication(appId);
+      navigate(`/application/${appId}`);
+    } catch (err) {
+      setError(err.message || "Unable to resume draft application");
+    }
   };
 
   // Format submitted date
@@ -149,22 +161,91 @@ export function Applications() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid-5 mb-5">
+      <div
+        className="mb-5"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 16,
+        }}
+      >
         {[
           ["Total", stats.total, "var(--gray-900)"],
           ["Submitted", stats.submitted, "var(--blue)"],
           ["Under Review", stats.under_review, "var(--yellow)"],
           ["Approved", stats.approved, "var(--green)"],
           ["Waitlisted", stats.waitlisted, "var(--purple)"],
+          ["Draft Applications", stats.draft, "var(--orange)"],
         ].map(([l, v, c], i) => (
-          <div className="stat-card" key={i}>
+          <button
+            className="stat-card"
+            key={i}
+            onClick={() => {
+              if (l === "Draft Applications") {
+                setShowDrafts((prev) => !prev);
+              }
+            }}
+            style={{
+              textAlign: "left",
+              cursor: l === "Draft Applications" ? "pointer" : "default",
+            }}
+          >
             <div className="stat-label">{l}</div>
             <div className="stat-value" style={{ color: c }}>
               {v}
             </div>
-          </div>
+          </button>
         ))}
       </div>
+
+      {showDrafts && (
+        <div className="card mb-5">
+          <div className="card-header">
+            <div className="card-title">Draft Applications</div>
+          </div>
+          {draftApplications.length === 0 ? (
+            <div style={{ padding: 24, color: "var(--gray-500)" }}>
+              No draft applications found.
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Application ID</th>
+                    <th>Student Name</th>
+                    <th>Current Step</th>
+                    <th>Last Updated</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftApplications.map((draft) => (
+                    <tr key={draft.id}>
+                      <td className="td-bold">{draft.id}</td>
+                      <td>{draft.student_name || "—"}</td>
+                      <td>{draft.current_step || 1}</td>
+                      <td>{formatDate(draft.updated_at)}</td>
+                      <td>
+                        <span className="badge badge-gray">Draft</span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleResumeDraft(draft.id)}
+                        >
+                          Resume
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Error Messages */}
       {error && (
@@ -213,7 +294,9 @@ export function Applications() {
                 onClick={() => setShowDrop(!showDrop)}
               >
                 ▽ &nbsp;
-                {filter === "all" ? "All Statuses" : statusMap[filter]?.label}{" "}
+                {filter === "all"
+                  ? "All Statuses"
+                  : statusMap[filter]?.label}{" "}
                 &nbsp;✓
               </button>
               {showDrop && (
@@ -311,13 +394,13 @@ export function Applications() {
               </thead>
               <tbody>
                 {filteredApps.map((app) => (
-                  <tr key={app.id || app.application_id}>
-                    <td className="td-bold">{app.id || app.application_id}</td>
-                    <td>{app.student_name || app.name || "—"}</td>
+                  <tr key={app.id}>
+                    <td className="td-bold">{app.id}</td>
+                    <td>{app.student_name || "—"}</td>
                     <td>{app.grade || "—"}</td>
-                    <td>{app.parent_contact || app.contact || "—"}</td>
+                    <td>{app.parent_contact || "—"}</td>
                     <td style={{ fontSize: 13 }}>
-                      {formatDate(app.submitted_date || app.submitted)}
+                      {formatDate(app.submitted_at)}
                     </td>
                     <td>
                       <span
@@ -329,9 +412,7 @@ export function Applications() {
                     <td>
                       <button
                         className="btn btn-ghost btn-icon"
-                        onClick={() =>
-                          handleViewApplication(app.id || app.application_id)
-                        }
+                        onClick={() => handleViewApplication(app.id)}
                         title="View application"
                       >
                         <Eye size={15} />

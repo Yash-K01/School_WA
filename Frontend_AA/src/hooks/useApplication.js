@@ -173,8 +173,11 @@ export function useApplication(applicationId) {
   // Check if step is completed
   const isStepCompleted = (step) => {
     if (!progress) return false;
-    const stepKey = `step_${step}_${Object.keys(progress.steps)[step - 1]}`.toLowerCase();
-    return progress.steps[Object.keys(progress.steps)[step - 1]] === 'completed';
+    if (progress.status === 'submitted') {
+      return true;
+    }
+
+    return Number(currentStep || progress.current_step || 1) > step;
   };
 
   return {

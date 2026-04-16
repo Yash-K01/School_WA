@@ -55,6 +55,7 @@ export default function App() {
             path="applications/form/:id"
             element={<MultiStepApplication />}
           />
+          <Route path="application/:id" element={<MultiStepApplication />} />
           <Route path="applications/new" element={<NewApplication />} />
           <Route path="screening" element={<Screening />} />
           <Route path="offers-seats" element={<OffersSeats />} />
