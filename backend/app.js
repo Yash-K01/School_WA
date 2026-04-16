@@ -145,6 +145,24 @@ app.use('/api', funnelRoutes);
 // ERROR HANDLING
 // ============================================================================
 
+app.use((error, req, res, next) => {
+  if (error?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      message: 'File too large. Max size is 5MB',
+    });
+  }
+
+  if (error?.name === 'MulterError') {
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'File upload failed',
+    });
+  }
+
+  next(error);
+});
+
 // 404 Not Found
 app.use((req, res) => {
   res.status(404).json({

@@ -124,8 +124,10 @@ const normalizeStoredFileRecord = (record) => {
     };
   }
 
-  const filePath = record.file_path || record.file_url || record.url || record.path || "";
-  const fileName = record.file_name || record.name || filePath.split("/").pop() || "File";
+  const filePath =
+    record.file_path || record.file_url || record.url || record.path || "";
+  const fileName =
+    record.file_name || record.name || filePath.split("/").pop() || "File";
   const publicUrl = getPublicUploadUrl(filePath);
 
   return {
@@ -156,7 +158,8 @@ const getPublicUploadUrl = (filePath) => {
     return String(filePath);
   }
 
-  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
+  const backendBaseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
   const normalizedPath = String(filePath).startsWith("/")
     ? String(filePath)
     : `/uploads/${String(filePath).split("/").pop()}`;
@@ -272,9 +275,12 @@ export function MultiStepApplication() {
   useEffect(() => {
     const nextYear = new Date().getFullYear() + 1;
     const timeoutMs = new Date(nextYear, 0, 1, 0, 0, 1).getTime() - Date.now();
-    const timer = window.setTimeout(() => {
-      setCurrentAcademicYear(new Date().getFullYear());
-    }, Math.max(timeoutMs, 1000));
+    const timer = window.setTimeout(
+      () => {
+        setCurrentAcademicYear(new Date().getFullYear());
+      },
+      Math.max(timeoutMs, 1000),
+    );
 
     return () => window.clearTimeout(timer);
   }, [currentAcademicYear]);
@@ -287,15 +293,20 @@ export function MultiStepApplication() {
 
     setAcademicForm((prev) => ({
       ...prev,
-      desired_class:
-        normalizeClassValue(
-          academicInfo.desired_class || details?.application?.desired_class || prev.desired_class,
-        ),
+      desired_class: normalizeClassValue(
+        academicInfo.desired_class ||
+          details?.application?.desired_class ||
+          prev.desired_class,
+      ),
       previous_school: academicInfo.previous_school || "",
       previous_class:
-        normalizeClassValue(academicInfo.previous_class || prev.previous_class) ||
+        normalizeClassValue(
+          academicInfo.previous_class || prev.previous_class,
+        ) ||
         getPreviousClassValue(
-          academicInfo.desired_class || details?.application?.desired_class || prev.desired_class,
+          academicInfo.desired_class ||
+            details?.application?.desired_class ||
+            prev.desired_class,
         ),
       marks_percentage:
         academicInfo.marks_percentage === null ||
@@ -331,10 +342,13 @@ export function MultiStepApplication() {
 
   useEffect(() => {
     if (details?.photos) {
-      const nextPhotos = Object.entries(details.photos).reduce((accumulator, [photoType, record]) => {
-        accumulator[photoType] = normalizeStoredFileRecord(record);
-        return accumulator;
-      }, {});
+      const nextPhotos = Object.entries(details.photos).reduce(
+        (accumulator, [photoType, record]) => {
+          accumulator[photoType] = normalizeStoredFileRecord(record);
+          return accumulator;
+        },
+        {},
+      );
 
       if (Object.keys(nextPhotos).length) {
         setPhotos((prev) => {
@@ -343,7 +357,11 @@ export function MultiStepApplication() {
             const index = merged.findIndex((item) => item.type === photoType);
             if (index >= 0) {
               if (!merged[index].file) {
-                merged[index] = { ...merged[index], ...record, type: photoType };
+                merged[index] = {
+                  ...merged[index],
+                  ...record,
+                  type: photoType,
+                };
               }
             } else {
               merged.push({ type: photoType, ...record });
@@ -355,10 +373,13 @@ export function MultiStepApplication() {
     }
 
     if (details?.documents) {
-      const nextDocs = Object.entries(details.documents).reduce((accumulator, [docType, record]) => {
-        accumulator[docType] = normalizeStoredFileRecord(record);
-        return accumulator;
-      }, {});
+      const nextDocs = Object.entries(details.documents).reduce(
+        (accumulator, [docType, record]) => {
+          accumulator[docType] = normalizeStoredFileRecord(record);
+          return accumulator;
+        },
+        {},
+      );
 
       if (Object.keys(nextDocs).length) {
         setDocuments((prev) => {
@@ -427,10 +448,13 @@ export function MultiStepApplication() {
           return;
         }
 
-        await handleSaveStudentInfo({
+        const saved = await handleSaveStudentInfo({
           ...studentForm,
           dob: studentForm.date_of_birth,
         });
+        if (!saved) {
+          return;
+        }
       } else if (step === 2) {
         // Step 2 is handled by ParentForm component's own submit button
         return;
@@ -469,7 +493,7 @@ export function MultiStepApplication() {
           details?.application?.schoolId ||
           null;
 
-        await handleSaveAcademicInfo({
+        const saved = await handleSaveAcademicInfo({
           application_id: payloadApplicationId,
           school_id: payloadSchoolId,
           desired_class: academicForm.desired_class,
@@ -485,6 +509,9 @@ export function MultiStepApplication() {
           extracurricular_activities: academicForm.extracurricular_activities,
           achievements: academicForm.achievements,
         });
+        if (!saved) {
+          return;
+        }
       } else if (step === 4) {
         const hasAllRequiredPhotos = REQUIRED_PHOTO_TYPES.every((photoType) =>
           photos.some((photo) => photo.type === photoType),
@@ -496,15 +523,19 @@ export function MultiStepApplication() {
           return;
         }
 
-        await handleSaveDocuments({
+        const saved = await handleSaveDocuments({
           stage: "photos",
           photos: {
-            student_photo: photos.find((p) => p.type === "student_photo") || null,
+            student_photo:
+              photos.find((p) => p.type === "student_photo") || null,
             passport_photos:
               photos.find((p) => p.type === "passport_photos") || null,
           },
           documents: {},
         });
+        if (!saved) {
+          return;
+        }
       } else if (step === 5) {
         const missingDocType = REQUIRED_DOCUMENT_TYPES.find(
           (docType) => !documents[docType],
@@ -517,21 +548,30 @@ export function MultiStepApplication() {
           return;
         }
 
-        await handleSaveDocuments({
+        const saved = await handleSaveDocuments({
           stage: "documents",
           photos: {
-            student_photo: photos.find((p) => p.type === "student_photo") || null,
+            student_photo:
+              photos.find((p) => p.type === "student_photo") || null,
             passport_photos:
               photos.find((p) => p.type === "passport_photos") || null,
           },
           documents,
         });
+        if (!saved) {
+          return;
+        }
       }
 
       // Move to next step (handled by hook usually, but we advance state here too)
       setStep((s) => s + 1);
     } catch (err) {
-      setMoveError(err.message || "Failed to save step. Please try again.");
+      const message = err.message || "Failed to save step. Please try again.";
+      setMoveError(
+        message.includes("File too large")
+          ? "File size exceeds 5MB"
+          : message,
+      );
     } finally {
       setSaving(false);
     }
@@ -557,7 +597,8 @@ export function MultiStepApplication() {
         });
       }, 1500);
     } catch (err) {
-      setMoveError(err.message || "Failed to submit application");
+      const message = err.message || "Failed to submit application";
+      setMoveError(message.includes("File too large") ? "File size exceeds 5MB" : message);
     } finally {
       setSaving(false);
     }
@@ -622,10 +663,12 @@ export function MultiStepApplication() {
   }, [photos, documents]);
 
   const academicYearOptions = [
-    ...new Set([
-      ...generateAcademicYears(currentAcademicYear),
-      academicForm.academic_year,
-    ].filter(Boolean)),
+    ...new Set(
+      [
+        ...generateAcademicYears(currentAcademicYear),
+        academicForm.academic_year,
+      ].filter(Boolean),
+    ),
   ];
 
   const progressSteps = [
@@ -639,7 +682,11 @@ export function MultiStepApplication() {
 
   const renderFileList = (records, emptyLabel) => {
     if (!records || (Array.isArray(records) && records.length === 0)) {
-      return <div style={{ color: "var(--gray-500)", fontSize: 13 }}>{emptyLabel}</div>;
+      return (
+        <div style={{ color: "var(--gray-500)", fontSize: 13 }}>
+          {emptyLabel}
+        </div>
+      );
     }
 
     const entries = Array.isArray(records) ? records : Object.values(records);
@@ -660,7 +707,9 @@ export function MultiStepApplication() {
             }}
           >
             <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{record.name || "File"}</div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                {record.name || "File"}
+              </div>
               <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
                 {record.file_path || record.url || "Uploaded file"}
               </div>
@@ -669,7 +718,13 @@ export function MultiStepApplication() {
               type="button"
               className="btn btn-outline btn-sm"
               onClick={() =>
-                openPreview(record, record.type || record.document_type || record.photo_type || "File")
+                openPreview(
+                  record,
+                  record.type ||
+                    record.document_type ||
+                    record.photo_type ||
+                    "File",
+                )
               }
             >
               View
@@ -747,7 +802,10 @@ export function MultiStepApplication() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="mb-8" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div
+        className="mb-8"
+        style={{ display: "flex", alignItems: "center", gap: 10 }}
+      >
         {progressSteps.map((s, index) => {
           const Icon = s.icon;
           const isCompleted = isStepCompleted(s.num);
@@ -779,14 +837,25 @@ export function MultiStepApplication() {
                       : isCurrent
                         ? "var(--primary)"
                         : "var(--gray-200)",
-                    color: isCompleted || isCurrent ? "white" : "var(--gray-600)",
-                    border: isCurrent ? "3px solid rgba(37, 99, 235, 0.18)" : "1px solid var(--gray-300)",
-                    boxShadow: isCurrent ? "0 12px 24px rgba(37, 99, 235, 0.16)" : "none",
+                    color:
+                      isCompleted || isCurrent ? "white" : "var(--gray-600)",
+                    border: isCurrent
+                      ? "3px solid rgba(37, 99, 235, 0.18)"
+                      : "1px solid var(--gray-300)",
+                    boxShadow: isCurrent
+                      ? "0 12px 24px rgba(37, 99, 235, 0.16)"
+                      : "none",
                   }}
                 >
                   {isCompleted ? <CheckCircle size={20} /> : <Icon size={18} />}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: isCurrent ? 700 : 500, marginTop: 8 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isCurrent ? 700 : 500,
+                    marginTop: 8,
+                  }}
+                >
                   {s.label}
                 </div>
               </div>
@@ -796,7 +865,9 @@ export function MultiStepApplication() {
                     height: 2,
                     flex: 1,
                     minWidth: 14,
-                    background: isStepCompleted(s.num) ? "var(--green)" : "var(--gray-200)",
+                    background: isStepCompleted(s.num)
+                      ? "var(--green)"
+                      : "var(--gray-200)",
                     borderRadius: 999,
                     marginTop: -18,
                   }}
@@ -1257,7 +1328,9 @@ export function MultiStepApplication() {
                   View
                 </button>
               </div>
-              <div style={{ marginTop: 6, fontSize: 12, color: "var(--gray-500)" }}>
+              <div
+                style={{ marginTop: 6, fontSize: 12, color: "var(--gray-500)" }}
+              >
                 {photos.find((p) => p.type === "student_photo")?.name ||
                   "No file selected"}
               </div>
@@ -1403,65 +1476,160 @@ export function MultiStepApplication() {
 
             <div className="grid-2 gap-4">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}
+                >
                   Student Info
                 </div>
-                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
-                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
-                    <div><strong>Name:</strong> {studentForm.first_name ? `${studentForm.first_name} ${studentForm.last_name || ""}` : "—"}</div>
-                    <div><strong>DOB:</strong> {studentForm.date_of_birth || "—"}</div>
-                    <div><strong>Gender:</strong> {studentForm.gender || "—"}</div>
-                    <div><strong>Phone:</strong> {studentForm.student_phone || "—"}</div>
-                    <div><strong>Email:</strong> {studentForm.student_email || "—"}</div>
+                <div
+                  className="card"
+                  style={{ border: "1px solid var(--gray-200)" }}
+                >
+                  <div
+                    className="card-body"
+                    style={{ display: "grid", gap: 10 }}
+                  >
+                    <div>
+                      <strong>Name:</strong>{" "}
+                      {studentForm.first_name
+                        ? `${studentForm.first_name} ${studentForm.last_name || ""}`
+                        : "—"}
+                    </div>
+                    <div>
+                      <strong>DOB:</strong> {studentForm.date_of_birth || "—"}
+                    </div>
+                    <div>
+                      <strong>Gender:</strong> {studentForm.gender || "—"}
+                    </div>
+                    <div>
+                      <strong>Phone:</strong> {studentForm.student_phone || "—"}
+                    </div>
+                    <div>
+                      <strong>Email:</strong> {studentForm.student_email || "—"}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}
+                >
                   Parent Info
                 </div>
-                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
-                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
-                    <div><strong>Primary Contact:</strong> {details?.parent_info?.primary_contact_person || details?.parent_info?.father_name || "—"}</div>
-                    <div><strong>Phone:</strong> {details?.parent_info?.primary_contact_phone || details?.parent_info?.father_phone || "—"}</div>
-                    <div><strong>Address:</strong> {details?.parent_info?.address || "—"}</div>
-                    <div><strong>City:</strong> {details?.parent_info?.city || "—"}</div>
-                    <div><strong>State:</strong> {details?.parent_info?.state || "—"}</div>
+                <div
+                  className="card"
+                  style={{ border: "1px solid var(--gray-200)" }}
+                >
+                  <div
+                    className="card-body"
+                    style={{ display: "grid", gap: 10 }}
+                  >
+                    <div>
+                      <strong>Primary Contact:</strong>{" "}
+                      {details?.parent_info?.primary_contact_person ||
+                        details?.parent_info?.father_name ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Phone:</strong>{" "}
+                      {details?.parent_info?.primary_contact_phone ||
+                        details?.parent_info?.father_phone ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Address:</strong>{" "}
+                      {details?.parent_info?.address || "—"}
+                    </div>
+                    <div>
+                      <strong>City:</strong> {details?.parent_info?.city || "—"}
+                    </div>
+                    <div>
+                      <strong>State:</strong>{" "}
+                      {details?.parent_info?.state || "—"}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}
+                >
                   Academic Info
                 </div>
-                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
-                  <div className="card-body" style={{ display: "grid", gap: 10 }}>
-                    <div><strong>Desired Class:</strong> {academicForm.desired_class || details?.academic_info?.desired_class || "—"}</div>
-                    <div><strong>Previous Class:</strong> {academicForm.previous_class || details?.academic_info?.previous_class || "—"}</div>
-                    <div><strong>Previous School:</strong> {academicForm.previous_school || details?.academic_info?.previous_school || "—"}</div>
-                    <div><strong>Academic Year:</strong> {academicForm.academic_year || details?.academic_info?.academic_year || details?.application?.academic_year_name || "—"}</div>
-                    <div><strong>Board:</strong> {academicForm.board_name || details?.academic_info?.board_name || "—"}</div>
+                <div
+                  className="card"
+                  style={{ border: "1px solid var(--gray-200)" }}
+                >
+                  <div
+                    className="card-body"
+                    style={{ display: "grid", gap: 10 }}
+                  >
+                    <div>
+                      <strong>Desired Class:</strong>{" "}
+                      {academicForm.desired_class ||
+                        details?.academic_info?.desired_class ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Previous Class:</strong>{" "}
+                      {academicForm.previous_class ||
+                        details?.academic_info?.previous_class ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Previous School:</strong>{" "}
+                      {academicForm.previous_school ||
+                        details?.academic_info?.previous_school ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Academic Year:</strong>{" "}
+                      {academicForm.academic_year ||
+                        details?.academic_info?.academic_year ||
+                        details?.application?.academic_year_name ||
+                        "—"}
+                    </div>
+                    <div>
+                      <strong>Board:</strong>{" "}
+                      {academicForm.board_name ||
+                        details?.academic_info?.board_name ||
+                        "—"}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}
+                >
                   Photos
                 </div>
-                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
-                  <div className="card-body">{renderFileList(photos, "No photos uploaded yet.")}</div>
+                <div
+                  className="card"
+                  style={{ border: "1px solid var(--gray-200)" }}
+                >
+                  <div className="card-body">
+                    {renderFileList(photos, "No photos uploaded yet.")}
+                  </div>
                 </div>
               </div>
 
               <div style={{ gridColumn: "1 / -1" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}
+                >
                   Documents
                 </div>
-                <div className="card" style={{ border: "1px solid var(--gray-200)" }}>
-                  <div className="card-body">{renderFileList(documents, "No documents uploaded yet.")}</div>
+                <div
+                  className="card"
+                  style={{ border: "1px solid var(--gray-200)" }}
+                >
+                  <div className="card-body">
+                    {renderFileList(documents, "No documents uploaded yet.")}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1471,30 +1639,63 @@ export function MultiStepApplication() {
 
       {previewItem && (
         <div className="modal-backdrop" onClick={() => setPreviewItem(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 860 }}>
+          <div
+            className="modal"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: 860 }}
+          >
             <div className="modal-header">
-              <div className="modal-title">{previewItem.title || previewItem.name}</div>
-              <button className="btn btn-outline btn-sm" onClick={() => setPreviewItem(null)}>
+              <div className="modal-title">
+                {previewItem.title || previewItem.name}
+              </div>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setPreviewItem(null)}
+              >
                 Close
               </button>
             </div>
             <div className="modal-body" style={{ minHeight: 420 }}>
-              {String(previewItem.mimeType || previewItem.url || "").toLowerCase().includes("pdf") ? (
+              {String(previewItem.mimeType || previewItem.url || "")
+                .toLowerCase()
+                .includes("pdf") ? (
                 <iframe
                   title={previewItem.name}
                   src={previewItem.url}
-                  style={{ width: "100%", height: 520, border: 0, borderRadius: 12 }}
+                  style={{
+                    width: "100%",
+                    height: 520,
+                    border: 0,
+                    borderRadius: 12,
+                  }}
                 />
-              ) : String(previewItem.mimeType || "").toLowerCase().startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(String(previewItem.url || "")) ? (
+              ) : String(previewItem.mimeType || "")
+                  .toLowerCase()
+                  .startsWith("image/") ||
+                /\.(png|jpe?g|webp|gif)$/i.test(
+                  String(previewItem.url || ""),
+                ) ? (
                 <img
                   src={previewItem.url}
                   alt={previewItem.name}
-                  style={{ width: "100%", maxHeight: 520, objectFit: "contain", borderRadius: 12 }}
+                  style={{
+                    width: "100%",
+                    maxHeight: 520,
+                    objectFit: "contain",
+                    borderRadius: 12,
+                  }}
                 />
               ) : (
                 <div style={{ padding: 24 }}>
-                  <div style={{ marginBottom: 12, fontWeight: 600 }}>{previewItem.name}</div>
-                  <a className="btn btn-primary" href={previewItem.url} target="_blank" rel="noreferrer">
+                  <div style={{ marginBottom: 12, fontWeight: 600 }}>
+                    {previewItem.name}
+                  </div>
+                  <a
+                    className="btn btn-primary"
+                    href={previewItem.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Open File
                   </a>
                 </div>

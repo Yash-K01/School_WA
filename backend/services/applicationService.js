@@ -1,5 +1,8 @@
+import fs from 'fs';
 import path from 'path';
 import pool from '../config/db.js';
+
+const uploadRoot = path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
 
 const APPLICATION_PHOTO_TYPES = ['student_photo', 'passport_photos'];
 const APPLICATION_DOCUMENT_TYPES = [
@@ -23,6 +26,30 @@ const toPublicFilePath = (filePathOrName) => {
   }
 
   return `/uploads/${path.basename(filePath)}`;
+};
+
+const toAbsoluteUploadPath = (filePathOrName) => {
+  if (!filePathOrName) {
+    return null;
+  }
+
+  const fileName = path.basename(String(filePathOrName));
+  return path.resolve(uploadRoot, fileName);
+};
+
+const deleteStoredFile = async (filePathOrName) => {
+  const absolutePath = toAbsoluteUploadPath(filePathOrName);
+  if (!absolutePath) {
+    return;
+  }
+
+  try {
+    await fs.promises.unlink(absolutePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.warn(`Failed to delete uploaded file ${absolutePath}:`, error.message);
+    }
+  }
 };
 
 const normalizeFileRecord = (record) => {
@@ -716,9 +743,6 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
   try {
     await client.query('BEGIN');
 
-    console.log('applicationId:', applicationId);
-    console.log('documents payload type:', typeof payload);
-
     const resolvedApplicationId = Number(applicationId);
     if (!Number.isInteger(resolvedApplicationId) || resolvedApplicationId <= 0) {
       throw new Error('Valid applicationId is required');
@@ -738,6 +762,7 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     const uploadedFileMap = new Map(
       (Array.isArray(uploadedFiles) ? uploadedFiles : []).map((file) => [file.fieldname, file]),
     );
+    const savedFiles = [];
 
     const stage = String(payload.stage || 'all').toLowerCase();
     const photosPayload = payload.photos && typeof payload.photos === 'object' ? payload.photos : {};
@@ -771,6 +796,25 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       };
     };
 
+    const deletePreviousFileIfReplaced = async (tableName, columnName, recordType, uploadedFile) => {
+      if (!uploadedFile?.file_path) {
+        return;
+      }
+
+      const previous = await client.query(
+        `SELECT file_path
+         FROM ${tableName}
+         WHERE application_id = $1 AND ${columnName} = $2
+         LIMIT 1`,
+        [resolvedApplicationId, recordType],
+      );
+
+      const previousFilePath = previous.rows[0]?.file_path;
+      if (previousFilePath && previousFilePath !== uploadedFile.file_path) {
+        await deleteStoredFile(previousFilePath);
+      }
+    };
+
     const upsertApplicationPhoto = async (photoType, value) => {
       const uploaded = resolveUploadedFile(`photo_${photoType}`) || resolveUploadedFile(photoType);
       const existing = uploaded || resolveExistingFile(value);
@@ -778,6 +822,8 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       if (!existing?.file_path) {
         return;
       }
+
+      await deletePreviousFileIfReplaced('application_photos', 'photo_type', photoType, uploaded);
 
       await client.query(
         `INSERT INTO application_photos
@@ -798,6 +844,12 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
           existing.mime_type || null,
         ],
       );
+
+      savedFiles.push({
+        type: photoType,
+        file_path: existing.file_path,
+        file_name: existing.file_name || path.basename(existing.file_path),
+      });
     };
 
     const upsertApplicationDocument = async (documentType, value) => {
@@ -807,6 +859,8 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       if (!existing?.file_path) {
         return;
       }
+
+      await deletePreviousFileIfReplaced('application_documents', 'document_type', documentType, uploaded);
 
       await client.query(
         `INSERT INTO application_documents
@@ -827,6 +881,12 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
           existing.mime_type || null,
         ],
       );
+
+      savedFiles.push({
+        type: documentType,
+        file_path: existing.file_path,
+        file_name: existing.file_name || path.basename(existing.file_path),
+      });
     };
 
     if (stage === 'photos' || stage === 'all') {
@@ -858,7 +918,13 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     }
 
     await client.query('COMMIT');
-    return { success: true, message: 'Application files saved' };
+
+    return {
+      success: true,
+      file_path: savedFiles[0]?.file_path || null,
+      files: savedFiles,
+      message: 'Application files saved',
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw new Error(`Failed to save documents: ${error.message}`);

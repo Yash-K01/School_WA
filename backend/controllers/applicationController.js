@@ -429,15 +429,50 @@ export const saveDocuments = async (req, res) => {
   try {
     const { id } = req.params;
     const rawPayload = req.body?.payload ?? req.body;
-    const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload || {};
+    let payload = rawPayload || {};
+    const incomingFiles = [
+      ...(Array.isArray(req.files) ? req.files : []),
+      ...(req.file ? [req.file] : []),
+    ];
 
-    await applicationService.saveDocuments(id, payload, req.files || []);
+    if (typeof rawPayload === 'string' && rawPayload.trim()) {
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid documents payload',
+        });
+      }
+    }
+
+    if (payload?.document_type && incomingFiles.length === 1 && !payload.documents) {
+      incomingFiles[0].fieldname = `document_${payload.document_type}`;
+      payload = {
+        stage: 'documents',
+        documents: {
+          [payload.document_type]: {},
+        },
+        photos: {},
+      };
+    }
+
+    const result = await applicationService.saveDocuments(id, payload, incomingFiles);
     res.json({
       success: true,
+      file_path: result.file_path || null,
+      data: result,
       message: 'Documents saved successfully'
     });
   } catch (error) {
     console.error('Error saving documents:', error);
+    if (error.message?.includes('Application Not Found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found',
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: error.message

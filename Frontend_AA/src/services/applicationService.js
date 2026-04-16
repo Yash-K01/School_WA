@@ -32,7 +32,9 @@ const request = async (url, options = {}) => {
     ...(options.headers || {}),
   };
 
-  if (!isFormData) {
+  if (isFormData) {
+    delete mergedHeaders['Content-Type'];
+  } else {
     mergedHeaders['Content-Type'] = 'application/json';
   }
 
@@ -41,10 +43,23 @@ const request = async (url, options = {}) => {
     headers: mergedHeaders,
   });
 
-  const data = await response.json().catch(() => null);
+  const responseText = await response.text().catch(() => '');
+  let data = null;
+
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = null;
+    }
+  }
 
   if (!response.ok || !data?.success) {
     const serverMessage = data?.message || data?.error;
+    if (response.status === 413) {
+      throw new Error(serverMessage || 'File too large. Max size is 5MB');
+    }
+
     throw new Error(serverMessage || `HTTP ${response.status}: ${response.statusText}`);
   }
 
