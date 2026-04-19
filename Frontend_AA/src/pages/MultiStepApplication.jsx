@@ -448,13 +448,10 @@ export function MultiStepApplication() {
           return;
         }
 
-        const saved = await handleSaveStudentInfo({
+        await handleSaveStudentInfo({
           ...studentForm,
           dob: studentForm.date_of_birth,
         });
-        if (!saved) {
-          return;
-        }
       } else if (step === 2) {
         // Step 2 is handled by ParentForm component's own submit button
         return;
@@ -493,7 +490,7 @@ export function MultiStepApplication() {
           details?.application?.schoolId ||
           null;
 
-        const saved = await handleSaveAcademicInfo({
+        await handleSaveAcademicInfo({
           application_id: payloadApplicationId,
           school_id: payloadSchoolId,
           desired_class: academicForm.desired_class,
@@ -509,9 +506,6 @@ export function MultiStepApplication() {
           extracurricular_activities: academicForm.extracurricular_activities,
           achievements: academicForm.achievements,
         });
-        if (!saved) {
-          return;
-        }
       } else if (step === 4) {
         const hasAllRequiredPhotos = REQUIRED_PHOTO_TYPES.every((photoType) =>
           photos.some((photo) => photo.type === photoType),
@@ -523,7 +517,7 @@ export function MultiStepApplication() {
           return;
         }
 
-        const saved = await handleSaveDocuments({
+        await handleSaveDocuments({
           stage: "photos",
           photos: {
             student_photo:
@@ -533,9 +527,6 @@ export function MultiStepApplication() {
           },
           documents: {},
         });
-        if (!saved) {
-          return;
-        }
       } else if (step === 5) {
         const missingDocType = REQUIRED_DOCUMENT_TYPES.find(
           (docType) => !documents[docType],
@@ -548,7 +539,7 @@ export function MultiStepApplication() {
           return;
         }
 
-        const saved = await handleSaveDocuments({
+        await handleSaveDocuments({
           stage: "documents",
           photos: {
             student_photo:
@@ -558,20 +549,12 @@ export function MultiStepApplication() {
           },
           documents,
         });
-        if (!saved) {
-          return;
-        }
       }
 
       // Move to next step (handled by hook usually, but we advance state here too)
       setStep((s) => s + 1);
     } catch (err) {
-      const message = err.message || "Failed to save step. Please try again.";
-      setMoveError(
-        message.includes("File too large")
-          ? "File size exceeds 5MB"
-          : message,
-      );
+      setMoveError(err.message || "Failed to save step. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -597,8 +580,7 @@ export function MultiStepApplication() {
         });
       }, 1500);
     } catch (err) {
-      const message = err.message || "Failed to submit application";
-      setMoveError(message.includes("File too large") ? "File size exceeds 5MB" : message);
+      setMoveError(err.message || "Failed to submit application");
     } finally {
       setSaving(false);
     }

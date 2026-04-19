@@ -1,19 +1,15 @@
-import fs from 'fs';
 import path from 'path';
 import pool from '../config/db.js';
-
-const uploadRoot = path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
+import {
+  VALID_APPLICATION_DOCUMENT_TYPES,
+  normalizeApplicationDocumentType,
+} from '../utils/applicationDocumentTypes.js';
 
 const APPLICATION_PHOTO_TYPES = ['student_photo', 'passport_photos'];
-const APPLICATION_DOCUMENT_TYPES = [
-  'birth_certificate',
-  'aadhaar_card',
-  'passport_photos',
-  'transfer_certificate',
-  'previous_report_card',
-  'address_proof',
-  'parent_id_proof',
-];
+const APPLICATION_DOCUMENT_TYPES = VALID_APPLICATION_DOCUMENT_TYPES;
+const APPLICATION_DOCUMENT_TYPES_SQL = VALID_APPLICATION_DOCUMENT_TYPES
+  .map((documentType) => `'${documentType}'`)
+  .join(',\n            ');
 
 const toPublicFilePath = (filePathOrName) => {
   if (!filePathOrName) {
@@ -26,30 +22,6 @@ const toPublicFilePath = (filePathOrName) => {
   }
 
   return `/uploads/${path.basename(filePath)}`;
-};
-
-const toAbsoluteUploadPath = (filePathOrName) => {
-  if (!filePathOrName) {
-    return null;
-  }
-
-  const fileName = path.basename(String(filePathOrName));
-  return path.resolve(uploadRoot, fileName);
-};
-
-const deleteStoredFile = async (filePathOrName) => {
-  const absolutePath = toAbsoluteUploadPath(filePathOrName);
-  if (!absolutePath) {
-    return;
-  }
-
-  try {
-    await fs.promises.unlink(absolutePath);
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      console.warn(`Failed to delete uploaded file ${absolutePath}:`, error.message);
-    }
-  }
 };
 
 const normalizeFileRecord = (record) => {
@@ -89,7 +61,40 @@ const ensureApplicationFileConstraints = async (client) => {
   await client.query(`
     ALTER TABLE application_documents
       ADD COLUMN IF NOT EXISTS file_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS uploaded_by BIGINT,
+      ADD COLUMN IF NOT EXISTS verified_by BIGINT,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  await client.query(`
+    ALTER TABLE application_documents
+      DROP CONSTRAINT IF EXISTS unique_application_documents,
+      DROP CONSTRAINT IF EXISTS unique_application_documents_application_document_type,
+      DROP CONSTRAINT IF EXISTS unique_application_documents_application,
+      DROP CONSTRAINT IF EXISTS application_documents_application_id_fkey,
+      DROP CONSTRAINT IF EXISTS application_documents_uploaded_by_fkey,
+      DROP CONSTRAINT IF EXISTS application_documents_verified_by_fkey,
+      DROP CONSTRAINT IF EXISTS fk_app_docs_app,
+      DROP CONSTRAINT IF EXISTS fk_app_docs_uploaded,
+      DROP CONSTRAINT IF EXISTS fk_app_docs_verified,
+        DROP CONSTRAINT IF EXISTS application_documents_document_type_check,
+        DROP CONSTRAINT IF EXISTS check_document_type
+  `);
+
+  await client.query(`
+    ALTER TABLE application_documents
+      ADD CONSTRAINT application_documents_application_id_fkey
+        FOREIGN KEY (application_id) REFERENCES application(id) ON DELETE CASCADE,
+      ADD CONSTRAINT application_documents_uploaded_by_fkey
+        FOREIGN KEY (uploaded_by) REFERENCES app_user(id) ON DELETE SET NULL,
+      ADD CONSTRAINT application_documents_verified_by_fkey
+        FOREIGN KEY (verified_by) REFERENCES app_user(id) ON DELETE SET NULL,
+      ADD CONSTRAINT application_documents_document_type_check
+        CHECK (
+          document_type IN (
+            ${APPLICATION_DOCUMENT_TYPES_SQL}
+          )
+        )
   `);
 
   await client.query(`
@@ -138,11 +143,11 @@ const ensureApplicationFileConstraints = async (client) => {
       IF NOT EXISTS (
         SELECT 1
         FROM pg_constraint
-        WHERE conname = 'unique_application_documents_application_document_type'
+        WHERE conname = 'unique_app_id_and_type'
           AND conrelid = 'application_documents'::regclass
       ) THEN
         ALTER TABLE application_documents
-          ADD CONSTRAINT unique_application_documents_application_document_type UNIQUE (application_id, document_type);
+          ADD CONSTRAINT unique_app_id_and_type UNIQUE (application_id, document_type);
       END IF;
     END $$;
   `);
@@ -743,6 +748,9 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
   try {
     await client.query('BEGIN');
 
+    console.log('applicationId:', applicationId);
+    console.log('documents payload type:', typeof payload);
+
     const resolvedApplicationId = Number(applicationId);
     if (!Number.isInteger(resolvedApplicationId) || resolvedApplicationId <= 0) {
       throw new Error('Valid applicationId is required');
@@ -762,11 +770,22 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     const uploadedFileMap = new Map(
       (Array.isArray(uploadedFiles) ? uploadedFiles : []).map((file) => [file.fieldname, file]),
     );
-    const savedFiles = [];
 
     const stage = String(payload.stage || 'all').toLowerCase();
     const photosPayload = payload.photos && typeof payload.photos === 'object' ? payload.photos : {};
     const documentsPayload = payload.documents && typeof payload.documents === 'object' ? payload.documents : {};
+
+    const inputDocumentTypes = Object.keys(documentsPayload);
+    const invalidInputDocumentTypes = inputDocumentTypes
+      .map((type) => normalizeApplicationDocumentType(type))
+      .filter((typeResult) => typeResult.usedFallback)
+      .map((typeResult) => String(typeResult.original));
+
+    if (invalidInputDocumentTypes.length > 0) {
+      console.warn(
+        `Invalid application document_type values received for application ${resolvedApplicationId}: ${invalidInputDocumentTypes.join(', ')}`,
+      );
+    }
 
     const resolveUploadedFile = (fieldName) => {
       const file = uploadedFileMap.get(fieldName);
@@ -796,25 +815,6 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       };
     };
 
-    const deletePreviousFileIfReplaced = async (tableName, columnName, recordType, uploadedFile) => {
-      if (!uploadedFile?.file_path) {
-        return;
-      }
-
-      const previous = await client.query(
-        `SELECT file_path
-         FROM ${tableName}
-         WHERE application_id = $1 AND ${columnName} = $2
-         LIMIT 1`,
-        [resolvedApplicationId, recordType],
-      );
-
-      const previousFilePath = previous.rows[0]?.file_path;
-      if (previousFilePath && previousFilePath !== uploadedFile.file_path) {
-        await deleteStoredFile(previousFilePath);
-      }
-    };
-
     const upsertApplicationPhoto = async (photoType, value) => {
       const uploaded = resolveUploadedFile(`photo_${photoType}`) || resolveUploadedFile(photoType);
       const existing = uploaded || resolveExistingFile(value);
@@ -822,8 +822,6 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       if (!existing?.file_path) {
         return;
       }
-
-      await deletePreviousFileIfReplaced('application_photos', 'photo_type', photoType, uploaded);
 
       await client.query(
         `INSERT INTO application_photos
@@ -844,23 +842,18 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
           existing.mime_type || null,
         ],
       );
-
-      savedFiles.push({
-        type: photoType,
-        file_path: existing.file_path,
-        file_name: existing.file_name || path.basename(existing.file_path),
-      });
     };
 
     const upsertApplicationDocument = async (documentType, value) => {
-      const uploaded = resolveUploadedFile(`document_${documentType}`) || resolveUploadedFile(documentType);
+      const normalizedTypeResult = normalizeApplicationDocumentType(documentType);
+      const safeDocumentType = normalizedTypeResult.normalized;
+
+      const uploaded = resolveUploadedFile(`document_${safeDocumentType}`) || resolveUploadedFile(safeDocumentType);
       const existing = uploaded || resolveExistingFile(value);
 
       if (!existing?.file_path) {
         return;
       }
-
-      await deletePreviousFileIfReplaced('application_documents', 'document_type', documentType, uploaded);
 
       await client.query(
         `INSERT INTO application_documents
@@ -874,19 +867,13 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
              updated_at = CURRENT_TIMESTAMP`,
         [
           resolvedApplicationId,
-          documentType,
+          safeDocumentType,
           existing.file_name || path.basename(existing.file_path),
           existing.file_path,
           existing.file_size || null,
           existing.mime_type || null,
         ],
       );
-
-      savedFiles.push({
-        type: documentType,
-        file_path: existing.file_path,
-        file_name: existing.file_name || path.basename(existing.file_path),
-      });
     };
 
     if (stage === 'photos' || stage === 'all') {
@@ -904,8 +891,15 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     }
 
     if (stage === 'documents' || stage === 'all') {
+      for (const [documentType, value] of Object.entries(documentsPayload)) {
+        await upsertApplicationDocument(documentType, value);
+      }
+
+      // Preserve compatibility for clients sending files in multipart field names only.
       for (const documentType of APPLICATION_DOCUMENT_TYPES) {
-        await upsertApplicationDocument(documentType, documentsPayload[documentType]);
+        if (!(documentType in documentsPayload)) {
+          await upsertApplicationDocument(documentType, null);
+        }
       }
 
       await client.query(
@@ -918,13 +912,7 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     }
 
     await client.query('COMMIT');
-
-    return {
-      success: true,
-      file_path: savedFiles[0]?.file_path || null,
-      files: savedFiles,
-      message: 'Application files saved',
-    };
+    return { success: true, message: 'Application files saved' };
   } catch (error) {
     await client.query('ROLLBACK');
     throw new Error(`Failed to save documents: ${error.message}`);

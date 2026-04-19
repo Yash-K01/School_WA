@@ -1,0 +1,29 @@
+{
+  "sqltools.connections": [
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "Firstmysql",
+      "database": "tanmay",
+      "username": "root",
+      "password": "Tanmay&%9582"
+    },
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "postgres",
+      "group": "postgres",
+      "database": "school_erp",
+      "username": "postgres"
+    }
+  ]
+}

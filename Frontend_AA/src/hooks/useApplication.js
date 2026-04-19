@@ -58,6 +58,9 @@ export function useApplication(applicationId) {
   // Save student info and advance to next step
   const handleSaveStudentInfo = async (studentData) => {
     try {
+      setError(null);
+      setLoading(true);
+
       await saveStudentInfo(effectiveApplicationId, studentData);
 
       // Update progress
@@ -69,14 +72,19 @@ export function useApplication(applicationId) {
       return true;
     } catch (err) {
       console.error('❌ Error saving student info:', err);
-      throw err;
+      setError(err.message);
+      return false;
     } finally {
+      setLoading(false);
     }
   };
 
   // Save parent info and advance to next step
   const handleSaveParentInfo = async (parentData) => {
     try {
+      setError(null);
+      setLoading(true);
+
       await saveParentInfo(effectiveApplicationId, parentData);
 
       const updatedProgress = await getApplicationProgress(effectiveApplicationId);
@@ -87,14 +95,19 @@ export function useApplication(applicationId) {
       return true;
     } catch (err) {
       console.error('❌ Error saving parent info:', err);
-      throw err;
+      setError(err.message);
+      return false;
     } finally {
+      setLoading(false);
     }
   };
 
   // Save academic info and advance to next step
   const handleSaveAcademicInfo = async (academicData) => {
     try {
+      setError(null);
+      setLoading(true);
+
       await saveAcademicInfo(effectiveApplicationId, academicData);
 
       const updatedProgress = await getApplicationProgress(effectiveApplicationId);
@@ -105,14 +118,19 @@ export function useApplication(applicationId) {
       return true;
     } catch (err) {
       console.error('❌ Error saving academic info:', err);
-      throw err;
+      setError(err.message);
+      return false;
     } finally {
+      setLoading(false);
     }
   };
 
   // Save documents and advance to next step
   const handleSaveDocuments = async (documents) => {
     try {
+      setError(null);
+      setLoading(true);
+
       await saveDocuments(effectiveApplicationId, documents);
 
       const updatedProgress = await getApplicationProgress(effectiveApplicationId);
@@ -123,14 +141,19 @@ export function useApplication(applicationId) {
       return true;
     } catch (err) {
       console.error('❌ Error saving documents:', err);
-      throw err;
+      setError(err.message);
+      return false;
     } finally {
+      setLoading(false);
     }
   };
 
   // Submit application
   const handleSubmitApplication = async () => {
     try {
+      setError(null);
+      setLoading(true);
+
       await submitApplication(effectiveApplicationId);
 
       const updatedProgress = await getApplicationProgress(effectiveApplicationId);
@@ -140,8 +163,10 @@ export function useApplication(applicationId) {
       return true;
     } catch (err) {
       console.error('❌ Error submitting application:', err);
-      throw err;
+      setError(err.message);
+      return false;
     } finally {
+      setLoading(false);
     }
   };
 

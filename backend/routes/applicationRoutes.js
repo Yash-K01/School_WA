@@ -2,6 +2,7 @@ import express from 'express';
 import * as applicationController from '../controllers/applicationController.js';
 import { authMiddleware } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
+import { validateApplicationDocumentTypes } from '../middleware/validateApplicationDocumentTypes.js';
 
 const router = express.Router();
 
@@ -64,7 +65,12 @@ router.post('/:id/academic-info', applicationController.saveAcademicInfo);
  * POST /api/applications/:id/documents
  * Save documents (Step 5)
  */
-router.post('/:id/documents', upload.any(), applicationController.saveDocuments);
+router.post(
+	'/:id/documents',
+	upload.any(),
+	validateApplicationDocumentTypes,
+	applicationController.saveDocuments,
+);
 
 /**
  * POST /api/applications/:id/submit

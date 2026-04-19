@@ -914,17 +914,21 @@ CREATE INDEX idx_application_academic_info_desired_class ON application_academic
 CREATE TABLE application_documents (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
-  CONSTRAINT unique_application_documents_application UNIQUE (application_id),
+  CONSTRAINT unique_app_id_and_type UNIQUE (application_id, document_type),
   document_type VARCHAR(100) NOT NULL CHECK (
     document_type IN (
-      'student_photo',
       'birth_certificate',
-      'previous_marksheet',
+      'aadhaar_card',
+      'passport_photos',
       'transfer_certificate',
+      'previous_report_card',
+      'address_proof',
+      'parent_id_proof',
+      'student_photo',
+      'previous_marksheet',
       'aadhar_card',
       'father_id_proof',
       'mother_id_proof',
-      'address_proof',
       'other'
     )
   ),
@@ -1637,20 +1641,8 @@ CREATE INDEX idx_app_photos_photo_type ON application_photos(photo_type);
 -- ============================================================================
 -- STEP 5: DOCUMENTS
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS application_documents (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  application_id BIGINT NOT NULL REFERENCES application(id) ON DELETE CASCADE,
-  CONSTRAINT unique_application_documents_application UNIQUE (application_id),
-  document_type VARCHAR(100),
-  -- 'birth_certificate', 'address_proof', 'school_records', 'transfer_certificate'
-  file_path VARCHAR(500),
-  file_size INT,
-  mime_type VARCHAR(50),
-  is_required BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_app_documents_app_id ON application_documents(application_id);
-CREATE INDEX idx_app_documents_type ON application_documents(document_type);
+-- Primary application_documents definition is declared earlier in this file.
+-- Keeping a second CREATE TABLE block here causes schema drift and duplicate constraints.
 -- ============================================================================
 -- TRIGGERS & CONSTRAINTS
 -- ============================================================================
