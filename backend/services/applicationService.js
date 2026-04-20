@@ -1,4 +1,5 @@
 import path from 'path';
+import { unlink } from 'fs/promises';
 import pool from '../config/db.js';
 import {
   VALID_APPLICATION_DOCUMENT_TYPES,
@@ -11,18 +12,18 @@ const APPLICATION_DOCUMENT_TYPES_SQL = VALID_APPLICATION_DOCUMENT_TYPES
   .map((documentType) => `'${documentType}'`)
   .join(',\n            ');
 
-const toPublicFilePath = (filePathOrName) => {
-  if (!filePathOrName) {
-    return null;
-  }
+  const toPublicFilePath = (filePathOrName) => {
+    if (!filePathOrName) {
+      return null;
+    }
 
-  const filePath = String(filePathOrName);
-  if (filePath.startsWith('/uploads/')) {
-    return filePath;
-  }
+    const filePath = String(filePathOrName);
+    if (filePath.startsWith('/uploads/')) {
+      return filePath;
+    }
 
-  return `/uploads/${path.basename(filePath)}`;
-};
+    return `/uploads/${path.basename(filePath)}`;
+  };
 
 const normalizeFileRecord = (record) => {
   if (!record) {
@@ -915,6 +916,22 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     return { success: true, message: 'Application files saved' };
   } catch (error) {
     await client.query('ROLLBACK');
+    
+    // Delete uploaded files if transaction failed (ensure file atomicity)
+    if (Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+      for (const file of uploadedFiles) {
+        try {
+          if (file.filename || file.path) {
+            const filePath = file.path || file.filename;
+            await unlink(filePath);
+            console.log(`✅ Deleted file: ${filePath}`);
+          }
+        } catch (unlinkError) {
+          console.error(`❌ Failed to delete file ${file.filename || file.path}: ${unlinkError.message}`);
+        }
+      }
+    }
+    
     throw new Error(`Failed to save documents: ${error.message}`);
   } finally {
     client.release();
