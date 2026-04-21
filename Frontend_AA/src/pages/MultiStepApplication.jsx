@@ -241,34 +241,58 @@ export function MultiStepApplication() {
 
   // Initialize forms from application details and lead data (auto-fill)
   useEffect(() => {
-    if (details) {
-      // 1. First priority: Existing saved student info
-      if (details.student_info && details.student_info.first_name) {
-        const si = details.student_info;
-        setStudentForm({
-          first_name: si.first_name || "",
-          last_name: si.last_name || "",
-          middle_name: si.middle_name || "",
-          date_of_birth: si.date_of_birth ? si.date_of_birth.split("T")[0] : "",
-          gender: si.gender || "",
-          blood_group: si.blood_group || "",
-          aadhar_number: si.aadhar_number || "",
-          student_phone: si.phone || details.application?.phone || "",
-          student_email: si.email || details.application?.email || "",
-        });
-      }
-      // 2. Second priority: Lead data from the application record
-      else if (details.application) {
-        const app = details.application;
-        // Split lead name if it's stored as first_name/last_name or full name
-        setStudentForm((p) => ({
-          ...p,
-          first_name: app.first_name || "",
-          last_name: app.last_name || "",
-          student_email: app.email || "",
-          student_phone: app.phone || "",
-        }));
-      }
+    if (!details) {
+      console.log("⏳ Waiting for application details...");
+      return;
+    }
+
+    console.log("📋 Application details received:", {
+      application: details.application,
+      student_info: details.student_info,
+      parent_info: details.parent_info,
+    });
+
+    // Priority 1: Existing saved student info (highest priority - don't overwrite)
+    if (details.student_info && Object.keys(details.student_info).length > 0) {
+      const si = details.student_info;
+      console.log("✅ Using saved student info:", si);
+      setStudentForm({
+        first_name: si.first_name || "",
+        last_name: si.last_name || "",
+        middle_name: si.middle_name || "",
+        date_of_birth: si.date_of_birth ? si.date_of_birth.split("T")[0] : "",
+        gender: si.gender || "",
+        blood_group: si.blood_group || "",
+        aadhar_number: si.aadhar_number || "",
+        student_phone: si.phone || "",
+        student_email: si.email || "",
+      });
+      return;
+    }
+
+    // Priority 2: Lead data from application record (auto-fill from lead)
+    if (details.application) {
+      const app = details.application;
+      console.log("📌 Lead data available for auto-fill:", {
+        lead_first_name: app.lead_first_name,
+        lead_last_name: app.lead_last_name,
+        lead_email: app.lead_email,
+        lead_phone: app.lead_phone,
+        lead_desired_class: app.lead_desired_class,
+      });
+
+      // Use lead_ prefixed fields for auto-fill
+      setStudentForm((prev) => ({
+        ...prev,
+        first_name: app.lead_first_name || "",
+        last_name: app.lead_last_name || "",
+        student_email: app.lead_email || "",
+        student_phone: app.lead_phone || "",
+      }));
+
+      console.log("✅ Auto-filled form from lead data");
+    } else {
+      console.log("⚠️ No lead data available - using manual entry mode");
     }
   }, [details]);
 

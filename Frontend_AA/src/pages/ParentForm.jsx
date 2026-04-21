@@ -45,67 +45,108 @@ export default function ParentForm({
 
   // Auto-fill from lead if available
   useEffect(() => {
-    if (lead) {
-      setForm((f) => ({
-        ...f,
-        fatherPhone: lead.phone || "",
-        fatherEmail: lead.email || "",
-      }));
+    if (!lead) {
+      console.log("⏳ [ParentForm] Waiting for lead data...");
+      return;
     }
+
+    console.log("📌 [ParentForm] Lead data received:", {
+      lead_first_name: lead.lead_first_name,
+      lead_last_name: lead.lead_last_name,
+      lead_email: lead.lead_email,
+      lead_phone: lead.lead_phone,
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+      email: lead.email,
+      phone: lead.phone,
+    });
+
+    // Build father name from lead (assuming lead contact is typically parent)
+    const fatherFirstName = lead.lead_first_name || lead.first_name || "";
+    const fatherLastName = lead.lead_last_name || lead.last_name || "";
+    const fatherFullName = [fatherFirstName, fatherLastName]
+      .filter((n) => n)
+      .join(" ");
+
+    // Use lead_ prefixed fields (from application) or fallback to unprefixed (from direct lead object)
+    const leadPhone = lead.lead_phone || lead.phone || "";
+    const leadEmail = lead.lead_email || lead.email || "";
+
+    setForm((f) => ({
+      ...f,
+      fatherName: fatherFullName || f.fatherName,
+      fatherPhone: leadPhone || f.fatherPhone,
+      fatherEmail: leadEmail || f.fatherEmail,
+    }));
+
+    console.log("✅ [ParentForm] Auto-filled from lead data:", {
+      fatherName: fatherFullName,
+      fatherPhone: leadPhone,
+      fatherEmail: leadEmail,
+    });
   }, [lead]);
 
   useEffect(() => {
-    if (initialData) {
-      setForm((f) => ({
-        ...f,
-        fatherName:
-          initialData.father_name || initialData.fatherName || f.fatherName,
-        fatherPhone:
-          initialData.father_phone || initialData.fatherPhone || f.fatherPhone,
-        fatherEmail:
-          initialData.father_email || initialData.fatherEmail || f.fatherEmail,
-        fatherOccupation:
-          initialData.father_occupation ||
-          initialData.fatherOccupation ||
-          f.fatherOccupation,
-        motherName:
-          initialData.mother_name || initialData.motherName || f.motherName,
-        motherPhone:
-          initialData.mother_phone || initialData.motherPhone || f.motherPhone,
-        motherEmail:
-          initialData.mother_email || initialData.motherEmail || f.motherEmail,
-        motherOccupation:
-          initialData.mother_occupation ||
-          initialData.motherOccupation ||
-          f.motherOccupation,
-        guardianName:
-          initialData.guardian_name ||
-          initialData.guardianName ||
-          f.guardianName,
-        guardianRelation:
-          initialData.guardian_relation ||
-          initialData.guardianRelation ||
-          f.guardianRelation,
-        guardianPhone:
-          initialData.guardian_phone ||
-          initialData.guardianPhone ||
-          f.guardianPhone,
-        guardianEmail:
-          initialData.guardian_email ||
-          initialData.guardianEmail ||
-          f.guardianEmail,
-        primaryContactPerson:
-          initialData.primary_contact_person ||
-          initialData.primaryContactPerson ||
-          f.primaryContactPerson,
-        primaryContactRelation:
-          initialData.primary_contact_relation ||
-          initialData.primaryContactRelation ||
-          f.primaryContactRelation,
-        primaryContactPhone:
-          initialData.primary_contact_phone ||
-          initialData.primaryContactPhone ||
-          f.primaryContactPhone,
+    if (!initialData || Object.keys(initialData).length === 0) {
+      console.log("⏳ [ParentForm] Waiting for saved parent data...");
+      return;
+    }
+
+    console.log(
+      "📦 [ParentForm] Loaded parent data from database:",
+      initialData,
+    );
+
+    setForm((f) => ({
+      ...f,
+      fatherName:
+        initialData.father_name || initialData.fatherName || f.fatherName,
+      fatherPhone:
+        initialData.father_phone || initialData.fatherPhone || f.fatherPhone,
+      fatherEmail:
+        initialData.father_email || initialData.fatherEmail || f.fatherEmail,
+      fatherOccupation:
+        initialData.father_occupation ||
+        initialData.fatherOccupation ||
+        f.fatherOccupation,
+      motherName:
+        initialData.mother_name || initialData.motherName || f.motherName,
+      motherPhone:
+        initialData.mother_phone || initialData.motherPhone || f.motherPhone,
+      motherEmail:
+        initialData.mother_email || initialData.motherEmail || f.motherEmail,
+      motherOccupation:
+        initialData.mother_occupation ||
+        initialData.motherOccupation ||
+        f.motherOccupation,
+      guardianName:
+        initialData.guardian_name ||
+        initialData.guardianName ||
+        f.guardianName,
+      guardianRelation:
+        initialData.guardian_relation ||
+        initialData.guardianRelation ||
+        f.guardianRelation,
+      guardianPhone:
+        initialData.guardian_phone ||
+        initialData.guardianPhone ||
+        f.guardianPhone,
+      guardianEmail:
+        initialData.guardian_email ||
+        initialData.guardianEmail ||
+        f.guardianEmail,
+      primaryContactPerson:
+        initialData.primary_contact_person ||
+        initialData.primaryContactPerson ||
+        f.primaryContactPerson,
+      primaryContactRelation:
+        initialData.primary_contact_relation ||
+        initialData.primaryContactRelation ||
+        f.primaryContactRelation,
+      primaryContactPhone:
+        initialData.primary_contact_phone ||
+        initialData.primaryContactPhone ||
+        f.primaryContactPhone,
         address: initialData.address || f.address,
         city: initialData.city || f.city,
         state: initialData.state || f.state,
@@ -114,7 +155,8 @@ export default function ParentForm({
         incomeRange:
           initialData.income_range || initialData.incomeRange || f.incomeRange,
       }));
-    }
+
+      console.log("✅ [ParentForm] Loaded parent data successfully");
   }, [initialData]);
 
   // Validation logic
