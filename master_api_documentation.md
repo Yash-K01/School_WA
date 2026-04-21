@@ -50,28 +50,37 @@ This is the complete, authoritative API documentation for the School ERP system.
 **Purpose:** Authenticate user and receive JWT token
 
 **Does:**
+
 - Validates email/password
 - Returns JWT token with `school_id` and `user_id`
 - Returns user metadata
 
 **Does NOT:**
+
 - Create accounts (use `/auth/signup`)
 - Send verification codes
 - Implement OAuth
 - Return full profile data
 
 **Request:**
+
 ```json
 { "email": "admin@school.com", "password": "pass123" }
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": { "id": 123, "email": "admin@school.com", "school_id": 1, "role": "admin" }
+    "user": {
+      "id": 123,
+      "email": "admin@school.com",
+      "school_id": 1,
+      "role": "admin"
+    }
   },
   "message": "Login successful"
 }
@@ -84,26 +93,38 @@ This is the complete, authoritative API documentation for the School ERP system.
 **Purpose:** Create new user account
 
 **Does:**
+
 - Creates user with hashed password
 - Returns JWT token immediately
 - Assigns to school
 
 **Does NOT:**
+
 - Send verification email
 - Require email verification
 - Allow duplicate emails
 - Auto-assign admin privileges
 
 **Request:**
+
 ```json
-{ "email": "staff@school.com", "password": "pass123", "name": "John Doe", "school_id": 1 }
+{
+  "email": "staff@school.com",
+  "password": "pass123",
+  "name": "John Doe",
+  "school_id": 1
+}
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
-  "data": { "token": "...", "user": { "id": 124, "email": "staff@school.com", "school_id": 1 } },
+  "data": {
+    "token": "...",
+    "user": { "id": 124, "email": "staff@school.com", "school_id": 1 }
+  },
   "message": "Account created successfully"
 }
 ```
@@ -115,23 +136,27 @@ This is the complete, authoritative API documentation for the School ERP system.
 **Purpose:** Verify token and get current user
 
 **Does:**
+
 - Returns authenticated user data
 - Verifies token validity
 - Shows school affiliation
 
 **Does NOT:**
+
 - Refresh expired tokens
 - Return other users' data
 - Update profile
 - Work without JWT token
 
 **Request:**
+
 ```
 GET /api/auth/me
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -148,12 +173,14 @@ Authorization: Bearer <token>
 **Purpose:** Create new lead (prospective student)
 
 **Does:**
+
 - Creates lead with contact info
 - Associates with authenticated school
 - Sets `follow_up_status` to "pending"
 - Records `created_by` from JWT token
 
 **Does NOT:**
+
 - Create application automatically
 - Send emails/SMS
 - Validate phone format
@@ -161,6 +188,7 @@ Authorization: Bearer <token>
 - Auto-assign follow-up teams
 
 **Request:**
+
 ```json
 {
   "first_name": "Rajesh",
@@ -175,6 +203,7 @@ Authorization: Bearer <token>
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
@@ -190,28 +219,37 @@ Authorization: Bearer <token>
 **Purpose:** Retrieve all leads with optional filtering
 
 **Does:**
+
 - Returns paginated leads for authenticated school
 - Filters by `follow_up_status`, `desired_class`, `assigned_to`
 - Returns contact info and metadata
 
 **Does NOT:**
+
 - Return leads from other schools
 - Include application data
 - Send notifications
 - Modify status
 
 **Request:**
+
 ```
 GET /api/leads?follow_up_status=pending&desired_class=Grade%205
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 456, "first_name": "Rajesh", "email": "rajesh@example.com", "follow_up_status": "pending" }
+    {
+      "id": 456,
+      "first_name": "Rajesh",
+      "email": "rajesh@example.com",
+      "follow_up_status": "pending"
+    }
   ]
 }
 ```
@@ -223,27 +261,37 @@ Authorization: Bearer <token>
 **Purpose:** Get specific lead details
 
 **Does:**
+
 - Returns complete lead record
 - Verifies lead belongs to authenticated school
 - Includes all fields and timestamps
 
 **Does NOT:**
+
 - Return associated applications
 - Show communication history
 - Modify data
 - Work for other schools' leads
 
 **Request:**
+
 ```
 GET /api/leads/456
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
-  "data": { "id": 456, "first_name": "Rajesh", "email": "rajesh@example.com", "phone": "9876543210", "desired_class": "Grade 5" }
+  "data": {
+    "id": 456,
+    "first_name": "Rajesh",
+    "email": "rajesh@example.com",
+    "phone": "9876543210",
+    "desired_class": "Grade 5"
+  }
 }
 ```
 
@@ -254,25 +302,37 @@ Authorization: Bearer <token>
 **Purpose:** Update lead when status changes
 
 **Does:**
+
 - Updates specified fields
 - Records timestamp
 - Validates school ownership
 - Allows any field except `school_id`, `created_by`
 
 **Does NOT:**
+
 - Create lead
 - Delete lead
 - Override immutable fields
 - Send notifications
 
 **Request:**
+
 ```json
-{ "follow_up_status": "interested", "assigned_to": 124, "notes": "Parent confirmed interest" }
+{
+  "follow_up_status": "interested",
+  "assigned_to": 124,
+  "notes": "Parent confirmed interest"
+}
 ```
 
 **Response (200):**
+
 ```json
-{ "success": true, "data": { "id": 456, "follow_up_status": "interested" }, "message": "Lead updated successfully" }
+{
+  "success": true,
+  "data": { "id": 456, "follow_up_status": "interested" },
+  "message": "Lead updated successfully"
+}
 ```
 
 ---
@@ -282,23 +342,27 @@ Authorization: Bearer <token>
 **Purpose:** Permanently remove lead record
 
 **Does:**
+
 - Deletes lead completely
 - Validates school ownership
 - Returns 204 No Content
 
 **Does NOT:**
+
 - Delete applications
 - Send notifications
 - Archive (permanent delete)
 - Support recovery
 
 **Request:**
+
 ```
 DELETE /api/leads/456
 Authorization: Bearer <token>
 ```
 
 **Response (204):**
+
 ```
 (No content)
 ```
@@ -310,31 +374,45 @@ Authorization: Bearer <token>
 **Purpose:** Get leads with upcoming follow-ups for dashboard
 
 **Does:**
+
 - Returns leads where `next_follow_up_date <= NOW() + interval`
 - Orders by priority (overdue→red, today→orange, upcoming→green)
 - Limits to specified count
 - Filters by active status
 
 **Does NOT:**
+
 - Include "converted"/"closed" leads
 - Modify dates
 - Send reminders
 - Return full details
 
 **Request:**
+
 ```
 GET /api/leads/followups/upcoming?interval=2&limit=10
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "count": 3,
   "data": [
-    { "id": 456, "first_name": "Rajesh", "phone": "9876543210", "priority": "overdue" },
-    { "id": 457, "first_name": "Priya", "phone": "9876543211", "priority": "today" }
+    {
+      "id": 456,
+      "first_name": "Rajesh",
+      "phone": "9876543210",
+      "priority": "overdue"
+    },
+    {
+      "id": 457,
+      "first_name": "Priya",
+      "phone": "9876543211",
+      "priority": "today"
+    }
   ]
 }
 ```
@@ -348,12 +426,14 @@ Authorization: Bearer <token>
 **Purpose:** Create formal application from lead
 
 **Does:**
+
 - Creates application linked to lead
 - Sets status to "draft"
 - Stores academic year
 - Returns application ID
 
 **Does NOT:**
+
 - Auto-fill student/parent data
 - Create without lead
 - Submit automatically
@@ -361,16 +441,19 @@ Authorization: Bearer <token>
 - Create student records
 
 **Key Context:**
+
 - **Max 1 submitted application per lead**
 - Multiple drafts allowed
 - **Auto-fill NOT automatic** - see data mapping section
 
 **Request:**
+
 ```json
 { "lead_id": 456, "academic_year_id": 2026 }
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
@@ -380,8 +463,12 @@ Authorization: Bearer <token>
 ```
 
 **Response (409):**
+
 ```json
-{ "success": false, "message": "Lead already has a submitted application for this year" }
+{
+  "success": false,
+  "message": "Lead already has a submitted application for this year"
+}
 ```
 
 ---
@@ -391,12 +478,14 @@ Authorization: Bearer <token>
 **Purpose:** Create application for manual entry (walk-in)
 
 **Does:**
+
 - Creates application with `lead_id = NULL`
 - Sets status to "draft"
 - Requires only `academic_year_id`
 - Allows manual field entry
 
 **Does NOT:**
+
 - Link to lead
 - Require eligibility checks
 - Auto-populate fields
@@ -404,11 +493,13 @@ Authorization: Bearer <token>
 - Validate parent info upfront
 
 **Request:**
+
 ```json
 { "academic_year_id": 2026 }
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
@@ -424,29 +515,38 @@ Authorization: Bearer <token>
 **Purpose:** Get leads available for application creation
 
 **Does:**
+
 - Returns leads without submitted applications
 - Filters by search term (name, email, phone)
 - Returns limited set based on `limit`
 - Ordered for UI selection
 
 **Does NOT:**
+
 - Auto-create applications
 - Filter by class/status
 - Return full details
 - Include leads with apps
 
 **Request:**
+
 ```
 GET /api/applications/eligible-leads?search=raj&limit=20
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 456, "first_name": "Rajesh", "email": "rajesh@example.com", "phone": "9876543210" }
+    {
+      "id": 456,
+      "first_name": "Rajesh",
+      "email": "rajesh@example.com",
+      "phone": "9876543210"
+    }
   ]
 }
 ```
@@ -458,28 +558,37 @@ Authorization: Bearer <token>
 **Purpose:** Retrieve all applications with filtering
 
 **Does:**
+
 - Returns paginated applications for school
 - Filters by status, academic year
 - Includes metadata (dates, names, status)
 
 **Does NOT:**
+
 - Return drafts only (use `/draft`)
 - Include full details
 - Show history
 - Modify status
 
 **Request:**
+
 ```
 GET /api/applications?status=submitted&academic_year=2026&limit=50
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 789, "student_name": "Rajesh Kumar", "status": "submitted", "created_at": "2026-04-21T10:30:00Z" }
+    {
+      "id": 789,
+      "student_name": "Rajesh Kumar",
+      "status": "submitted",
+      "created_at": "2026-04-21T10:30:00Z"
+    }
   ]
 }
 ```
@@ -491,28 +600,37 @@ Authorization: Bearer <token>
 **Purpose:** Get all incomplete draft applications
 
 **Does:**
+
 - Returns draft status applications
 - Includes name, dates, status
 - Scoped to authenticated school
 
 **Does NOT:**
+
 - Include submitted applications
 - Show rejected/admitted
 - Include full data
 - Modify status
 
 **Request:**
+
 ```
 GET /api/applications/draft
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 789, "student_name": "Rajesh Kumar", "started_at": "2026-04-21T10:30:00Z", "status": "draft" }
+    {
+      "id": 789,
+      "student_name": "Rajesh Kumar",
+      "started_at": "2026-04-21T10:30:00Z",
+      "status": "draft"
+    }
   ]
 }
 ```
@@ -524,22 +642,26 @@ Authorization: Bearer <token>
 **Purpose:** Get summary statistics for dashboard
 
 **Does:**
+
 - Returns count by status (draft, submitted, admitted, rejected)
 - Filtered by academic year if specified
 - Useful for dashboard widgets
 
 **Does NOT:**
+
 - Return detailed data
 - Filter by officer/criteria
 - Modify data
 
 **Request:**
+
 ```
 GET /api/applications/counts?academic_year=2026
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -554,29 +676,38 @@ Authorization: Bearer <token>
 **Purpose:** Search applications by name, email, phone, ID
 
 **Does:**
+
 - Returns applications matching search
 - Searches name, email, phone
 - Returns basic info
 - Useful for admissions team
 
 **Does NOT:**
+
 - Full-text search
 - Fuzzy matching
 - Separate submitted/draft
 - Modify results
 
 **Request:**
+
 ```
 GET /api/applications/search?q=rajesh
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 789, "student_name": "Rajesh Kumar", "email": "rajesh@example.com", "status": "submitted" }
+    {
+      "id": 789,
+      "student_name": "Rajesh Kumar",
+      "email": "rajesh@example.com",
+      "status": "submitted"
+    }
   ]
 }
 ```
@@ -588,24 +719,28 @@ Authorization: Bearer <token>
 **Purpose:** Get form completion status for progress bar
 
 **Does:**
+
 - Returns each step as completed/incomplete
 - Shows missing required information
 - Calculates completion percentage
 - Helps frontend display progress UI
 
 **Does NOT:**
+
 - Allow editing
 - Validate completeness
 - Submit application
 - Create steps
 
 **Request:**
+
 ```
 GET /api/applications/789/progress
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -629,12 +764,14 @@ Authorization: Bearer <token>
 **Purpose:** Retrieve all stored application data (for form prefilling)
 
 **Does:**
+
 - Returns complete application data
 - Includes student, parent, academic, documents
 - Fetches saved data
 - Used for prefilling form
 
 **Does NOT:**
+
 - Modify data
 - Auto-fill from lead (only returns saved app data)
 - Return lead details
@@ -644,23 +781,35 @@ Authorization: Bearer <token>
 Returns ONLY what's saved in application database. Does NOT auto-populate from lead. To prefill form, implement frontend logic to fetch lead + application separately, then merge in UI. See **Frontend Auto-Fill Implementation** section.
 
 **Request:**
+
 ```
 GET /api/applications/789/details
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": {
     "application_id": 789,
     "status": "draft",
-    "student_info": { "first_name": "Rajesh", "last_name": "Kumar", "date_of_birth": "2016-03-15" },
-    "parent_info": { "father_name": "Vikram Singh", "father_phone": "9876543200" },
+    "student_info": {
+      "first_name": "Rajesh",
+      "last_name": "Kumar",
+      "date_of_birth": "2016-03-15"
+    },
+    "parent_info": {
+      "father_name": "Vikram Singh",
+      "father_phone": "9876543200"
+    },
     "academic_info": { "current_school": "ABC School", "percentage": 85 },
     "documents": [
-      { "document_type": "birth_certificate", "file_url": "/uploads/789/birth_certificate.pdf" }
+      {
+        "document_type": "birth_certificate",
+        "file_url": "/uploads/789/birth_certificate.pdf"
+      }
     ]
   }
 }
@@ -673,6 +822,7 @@ Authorization: Bearer <token>
 **Purpose:** Save Step 1: Student personal information
 
 **Does:**
+
 - Saves biographical info
 - Accepts flexible naming (camelCase/snake_case)
 - Maps frontend names to database
@@ -680,6 +830,7 @@ Authorization: Bearer <token>
 - Accepts partial updates
 
 **Does NOT:**
+
 - Validate age/eligibility
 - Create student records
 - Send emails
@@ -687,6 +838,7 @@ Authorization: Bearer <token>
 - Validate format
 
 **Request:**
+
 ```json
 {
   "first_name": "Rajesh",
@@ -699,6 +851,7 @@ Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 { "success": true, "message": "Student information saved successfully" }
 ```
@@ -710,6 +863,7 @@ Authorization: Bearer <token>
 **Purpose:** Save Step 2: Parent/guardian information
 
 **Does:**
+
 - Saves parent details
 - Allows flexible naming
 - Maps fields to database
@@ -717,6 +871,7 @@ Authorization: Bearer <token>
 - Stores per-application
 
 **Does NOT:**
+
 - Create parent accounts
 - Send invitations
 - Validate format
@@ -724,6 +879,7 @@ Authorization: Bearer <token>
 - Link to parent records
 
 **Request:**
+
 ```json
 {
   "father_name": "Vikram Singh",
@@ -736,6 +892,7 @@ Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 { "success": true, "message": "Parent information saved successfully" }
 ```
@@ -747,11 +904,13 @@ Authorization: Bearer <token>
 **Purpose:** Save Step 3: Academic performance info
 
 **Does:**
+
 - Saves school, class, marks, subjects
 - Overwrites if re-saved
 - Accepts flexible naming
 
 **Does NOT:**
+
 - Validate grades/percentages
 - Verify school details
 - Calculate placement
@@ -759,6 +918,7 @@ Authorization: Bearer <token>
 - Upload transcripts
 
 **Request:**
+
 ```json
 {
   "current_school": "ABC School",
@@ -769,6 +929,7 @@ Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 { "success": true, "message": "Academic information saved successfully" }
 ```
@@ -780,6 +941,7 @@ Authorization: Bearer <token>
 **Purpose:** Save Steps 4-5: Upload documents/photos
 
 **Does:**
+
 - Accepts multipart/form-data uploads
 - Associates with document type
 - Stores in `/backend/uploads`
@@ -787,6 +949,7 @@ Authorization: Bearer <token>
 - Records timestamp
 
 **Does NOT:**
+
 - Validate file content
 - Scan for viruses
 - Compress files
@@ -794,6 +957,7 @@ Authorization: Bearer <token>
 - Limit uploads
 
 **Request:**
+
 ```
 POST /api/applications/789/documents
 Content-Type: multipart/form-data
@@ -805,11 +969,16 @@ Form Data:
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "document_type": "birth_certificate", "file_url": "/uploads/789/birth_certificate.pdf", "uploaded_at": "2026-04-21T11:30:00Z" }
+    {
+      "document_type": "birth_certificate",
+      "file_url": "/uploads/789/birth_certificate.pdf",
+      "uploaded_at": "2026-04-21T11:30:00Z"
+    }
   ]
 }
 ```
@@ -821,6 +990,7 @@ Form Data:
 **Purpose:** Finalize and submit application (Step 6)
 
 **Does:**
+
 - Changes status to "submitted"
 - Records timestamp
 - Locks for editing
@@ -828,6 +998,7 @@ Form Data:
 - Creates admissions record
 
 **Does NOT:**
+
 - Validate all data
 - Send emails/SMS
 - Assign officer
@@ -835,15 +1006,21 @@ Form Data:
 - Allow resubmission
 
 **Request:**
+
 ```json
 {}
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
-  "data": { "application_id": 789, "status": "submitted", "submitted_at": "2026-04-21T11:45:00Z" },
+  "data": {
+    "application_id": 789,
+    "status": "submitted",
+    "submitted_at": "2026-04-21T11:45:00Z"
+  },
   "message": "Application submitted successfully"
 }
 ```
@@ -855,23 +1032,27 @@ Form Data:
 **Purpose:** Resume draft application
 
 **Does:**
+
 - Returns draft if exists and belongs to school
 - Loads saved data
 - Used by applicants to continue
 
 **Does NOT:**
+
 - Reopen submitted apps
 - Auto-advance
 - Clear data
 - Create new app
 
 **Request:**
+
 ```
 GET /api/applications/789/resume
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -895,26 +1076,36 @@ Authorization: Bearer <token>
 **Purpose:** Retrieve all schools (admin view)
 
 **Does:**
+
 - Returns all registered schools
 - Includes basic info (name, city, principal, email)
 
 **Does NOT:**
+
 - Filter by user's school
 - Include configuration
 - Modify data
 
 **Request:**
+
 ```
 GET /api/schools
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "data": [
-    { "id": 1, "name": "Green Valley School", "email": "info@greenvalley.edu", "city": "Delhi", "principal_name": "Dr. Rajesh Kumar" }
+    {
+      "id": 1,
+      "name": "Green Valley School",
+      "email": "info@greenvalley.edu",
+      "city": "Delhi",
+      "principal_name": "Dr. Rajesh Kumar"
+    }
   ]
 }
 ```
@@ -926,21 +1117,25 @@ Authorization: Bearer <token>
 **Purpose:** Get specific school details
 
 **Does:**
+
 - Returns complete school profile
 - Includes address, year, principal, contact
 
 **Does NOT:**
+
 - Include student counts
 - Modify data
 - Return settings
 
 **Request:**
+
 ```
 GET /api/schools/1
 Authorization: Bearer <token>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -965,16 +1160,19 @@ Authorization: Bearer <token>
 **Purpose:** Create new school entry
 
 **Does:**
+
 - Creates school record
 - Returns newly created school
 
 **Does NOT:**
+
 - Create user accounts
 - Set up database
 - Validate license
 - Send emails
 
 **Request:**
+
 ```json
 {
   "name": "Sunshine Academy",
@@ -988,10 +1186,16 @@ Authorization: Bearer <token>
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
-  "data": { "id": 2, "name": "Sunshine Academy", "email": "info@sunshine.edu", "status": "active" },
+  "data": {
+    "id": 2,
+    "name": "Sunshine Academy",
+    "email": "info@sunshine.edu",
+    "status": "active"
+  },
   "message": "School created successfully"
 }
 ```
@@ -1078,15 +1282,15 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "first_name": "Rajesh",              // ← from lead
-  "last_name": "Kumar",                // ← from lead
-  "email": "rajesh@example.com",       // ← from lead
-  "phone": "9876543210",               // ← from lead
-  
-  "date_of_birth": "",                 // ← user must enter
-  "gender": "",                        // ← user must enter
-  "blood_group": "",                   // ← user must enter
-  "aadhar_number": ""                  // ← user must enter
+  "first_name": "Rajesh", // ← from lead
+  "last_name": "Kumar", // ← from lead
+  "email": "rajesh@example.com", // ← from lead
+  "phone": "9876543210", // ← from lead
+
+  "date_of_birth": "", // ← user must enter
+  "gender": "", // ← user must enter
+  "blood_group": "", // ← user must enter
+  "aadhar_number": "" // ← user must enter
 }
 ```
 
@@ -1095,10 +1299,10 @@ Authorization: Bearer <token>
 ```json
 {
   // Lead does NOT have parent information
-  "father_name": "",                   // ← user must enter
-  "father_phone": "",                  // ← user must enter
-  "mother_name": "",                   // ← user must enter
-  "mother_phone": ""                   // ← user must enter
+  "father_name": "", // ← user must enter
+  "father_phone": "", // ← user must enter
+  "mother_name": "", // ← user must enter
+  "mother_phone": "" // ← user must enter
 }
 ```
 
@@ -1106,23 +1310,23 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "current_class": "Grade 5",          // ← from lead.desired_class
-  "current_school": "",                // ← user must enter
-  "percentage": ""                     // ← user must enter
+  "current_class": "Grade 5", // ← from lead.desired_class
+  "current_school": "", // ← user must enter
+  "percentage": "" // ← user must enter
 }
 ```
 
 ### Key Mapping Table
 
-| Lead Field | Maps To | Notes |
-|-----------|---------|-------|
-| first_name | student_info.first_name | ✅ Can be pre-filled |
-| last_name | student_info.last_name | ✅ Can be pre-filled |
-| email | student_info.email | ✅ Can be pre-filled |
-| phone | student_info.phone | ✅ Can be pre-filled |
-| desired_class | academic_info.current_class | ✅ Can be pre-filled |
-| (parent info) | parent_info.* | ❌ Not in lead - user enters |
-| (date of birth) | student_info.date_of_birth | ❌ Not in lead - user enters |
+| Lead Field      | Maps To                     | Notes                        |
+| --------------- | --------------------------- | ---------------------------- |
+| first_name      | student_info.first_name     | ✅ Can be pre-filled         |
+| last_name       | student_info.last_name      | ✅ Can be pre-filled         |
+| email           | student_info.email          | ✅ Can be pre-filled         |
+| phone           | student_info.phone          | ✅ Can be pre-filled         |
+| desired_class   | academic_info.current_class | ✅ Can be pre-filled         |
+| (parent info)   | parent_info.\*              | ❌ Not in lead - user enters |
+| (date of birth) | student_info.date_of_birth  | ❌ Not in lead - user enters |
 
 ---
 
@@ -1159,16 +1363,16 @@ Authorization: Bearer <token>
 useEffect(() => {
   if (locationState?.lead && currentStep === 1) {
     const autoFillData = {
-      first_name: locationState.lead.first_name || '',
-      last_name: locationState.lead.last_name || '',
-      email: locationState.lead.email || '',
-      phone: locationState.lead.phone || '',
-      current_class: locationState.lead.desired_class || ''
+      first_name: locationState.lead.first_name || "",
+      last_name: locationState.lead.last_name || "",
+      email: locationState.lead.email || "",
+      phone: locationState.lead.phone || "",
+      current_class: locationState.lead.desired_class || "",
     };
-    
-    setFormData(prevData => ({
+
+    setFormData((prevData) => ({
       ...prevData,
-      ...autoFillData
+      ...autoFillData,
     }));
   }
 }, [locationState?.lead, currentStep]);
@@ -1177,18 +1381,20 @@ useEffect(() => {
 ### Common Auto-Fill Mistakes
 
 ❌ **WRONG:** Expecting backend auto-populate
+
 ```javascript
-GET /api/applications/789/details
+GET / api / applications / 789 / details;
 // Returns: { student_info: { first_name: "" } }  // Empty!
 ```
 
 ✅ **RIGHT:** Combine lead + application in frontend
+
 ```javascript
 const lead = locationState?.lead;
 const appDetails = await getApplicationDetails(appId);
 
 const formData = {
-  first_name: lead?.first_name || appDetails?.student_info?.first_name || '',
+  first_name: lead?.first_name || appDetails?.student_info?.first_name || "",
   // ... merge logic
 };
 ```
@@ -1201,11 +1407,13 @@ const formData = {
 
 **Symptom:** `POST /api/applications` returns 400
 
-**Causes:** 
+**Causes:**
+
 - Manual entry chosen but `lead_id` not set to `null`
 - Frontend sends `undefined` instead of `null`
 
 **Solution:**
+
 ```javascript
 // WRONG:
 POST /api/applications { academic_year_id: 2026 }  // ❌
@@ -1224,27 +1432,29 @@ POST /api/applications { lead_id: null, academic_year_id: 2026 }  // ✅
 **Symptom:** Form fields stay empty
 
 **Causes:**
+
 - Lead not passed in `location.state`
 - useEffect not detecting lead
 - Wrong variable check
 - Lead shape different
 
 **Solution:**
+
 ```javascript
 // Ensure lead passed from CreateApplication:
-navigate(`/applications/form/${app.id}`, { 
-  state: { lead: selectedLead }  // ✅ Pass here
+navigate(`/applications/form/${app.id}`, {
+  state: { lead: selectedLead }, // ✅ Pass here
 });
 
 // In MultiStepApplication - verify useEffect:
 const { state } = useLocation();
-console.log('Lead:', state?.lead);  // Debug
+console.log("Lead:", state?.lead); // Debug
 
 useEffect(() => {
   if (state?.lead && currentStep === 1) {
     // Auto-fill
   }
-}, [state?.lead, currentStep]);  // Include both
+}, [state?.lead, currentStep]); // Include both
 ```
 
 ---
@@ -1254,19 +1464,21 @@ useEffect(() => {
 **Symptom:** Data from previous steps disappears
 
 **Causes:**
+
 - `activeAdmissionId` not in sessionStorage
 - useEffect not fetching properly
 - Component unmounts
 
 **Solution:**
+
 ```javascript
 // Save app ID:
-sessionStorage.setItem('activeAdmissionId', applicationId);
+sessionStorage.setItem("activeAdmissionId", applicationId);
 
 // In useEffect:
-const appId = sessionStorage.getItem('activeAdmissionId');
+const appId = sessionStorage.getItem("activeAdmissionId");
 if (!appId) {
-  console.error('App ID not found!');
+  console.error("App ID not found!");
   return;
 }
 ```
@@ -1278,11 +1490,13 @@ if (!appId) {
 **Symptom:** Lead doesn't appear in dropdown
 
 **Causes:**
+
 - Lead already has submitted application
 - Search term doesn't match
 - Lead from different school
 
 **Solution:**
+
 ```javascript
 // Check: Does lead have submitted app?
 GET /api/applications?lead_id=456&status=submitted
@@ -1300,27 +1514,29 @@ POST /api/applications { lead_id: 456, academic_year_id: 2026 }
 **Symptom:** Document upload returns error
 
 **Causes:**
+
 - File exceeds 5MB
 - Invalid format
 - FormData incorrect
 
 **Solution:**
+
 ```javascript
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 if (file.size > MAX_FILE_SIZE) {
-  setError('File exceeds 5MB');
+  setError("File exceeds 5MB");
   return;
 }
 
-const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png'];
+const ALLOWED = ["application/pdf", "image/jpeg", "image/png"];
 if (!ALLOWED.includes(file.type)) {
-  setError('Invalid format');
+  setError("Invalid format");
   return;
 }
 
 const formData = new FormData();
-formData.append('document_type', 'birth_certificate');
-formData.append('files', file);
+formData.append("document_type", "birth_certificate");
+formData.append("files", file);
 ```
 
 ---
@@ -1330,6 +1546,7 @@ formData.append('files', file);
 ### Standard Response Format
 
 **Success:**
+
 ```json
 {
   "success": true,
@@ -1339,6 +1556,7 @@ formData.append('files', file);
 ```
 
 **Error:**
+
 ```json
 {
   "success": false,
@@ -1348,16 +1566,16 @@ formData.append('files', file);
 
 ### HTTP Status Codes
 
-| Code | Meaning | Example |
-|------|---------|---------|
-| 200 | Success | GET request returned data |
-| 201 | Created | POST created successfully |
-| 204 | Deleted | DELETE removed successfully |
-| 400 | Bad Request | Missing/invalid fields |
-| 401 | Unauthorized | Token invalid/expired |
-| 404 | Not Found | Resource doesn't exist |
-| 409 | Conflict | Lead has app, duplicate, etc. |
-| 500 | Server Error | Database/unexpected error |
+| Code | Meaning      | Example                       |
+| ---- | ------------ | ----------------------------- |
+| 200  | Success      | GET request returned data     |
+| 201  | Created      | POST created successfully     |
+| 204  | Deleted      | DELETE removed successfully   |
+| 400  | Bad Request  | Missing/invalid fields        |
+| 401  | Unauthorized | Token invalid/expired         |
+| 404  | Not Found    | Resource doesn't exist        |
+| 409  | Conflict     | Lead has app, duplicate, etc. |
+| 500  | Server Error | Database/unexpected error     |
 
 ---
 
@@ -1421,34 +1639,34 @@ curl -X POST http://localhost:5001/api/applications/789/submit \
 
 ### Endpoints by Task
 
-| Task | Endpoint | Method |
-|------|----------|--------|
-| Login | /auth/login | POST |
-| Get current user | /auth/me | GET |
-| Create lead | /leads | POST |
-| List leads | /leads | GET |
-| Get lead | /leads/:id | GET |
-| Update lead | /leads/:id | PUT |
-| Delete lead | /leads/:id | DELETE |
-| Get upcoming follow-ups | /leads/followups/upcoming | GET |
-| Create application | /applications | POST |
-| Create manual app | /applications/new | POST |
-| Get eligible leads | /applications/eligible-leads | GET |
-| List applications | /applications | GET |
-| Get draft apps | /applications/draft | GET |
-| Search applications | /applications/search | GET |
-| Get app counts | /applications/counts | GET |
-| Get app progress | /applications/:id/progress | GET |
-| Get app details | /applications/:id/details | GET |
-| Save student info | /applications/:id/student-info | POST |
-| Save parent info | /applications/:id/parent-info | POST |
-| Save academic info | /applications/:id/academic-info | POST |
-| Upload documents | /applications/:id/documents | POST |
-| Submit application | /applications/:id/submit | POST |
-| Resume draft | /applications/:id/resume | GET |
-| Get schools | /schools | GET |
-| Get school | /schools/:id | GET |
-| Create school | /schools | POST |
+| Task                    | Endpoint                        | Method |
+| ----------------------- | ------------------------------- | ------ |
+| Login                   | /auth/login                     | POST   |
+| Get current user        | /auth/me                        | GET    |
+| Create lead             | /leads                          | POST   |
+| List leads              | /leads                          | GET    |
+| Get lead                | /leads/:id                      | GET    |
+| Update lead             | /leads/:id                      | PUT    |
+| Delete lead             | /leads/:id                      | DELETE |
+| Get upcoming follow-ups | /leads/followups/upcoming       | GET    |
+| Create application      | /applications                   | POST   |
+| Create manual app       | /applications/new               | POST   |
+| Get eligible leads      | /applications/eligible-leads    | GET    |
+| List applications       | /applications                   | GET    |
+| Get draft apps          | /applications/draft             | GET    |
+| Search applications     | /applications/search            | GET    |
+| Get app counts          | /applications/counts            | GET    |
+| Get app progress        | /applications/:id/progress      | GET    |
+| Get app details         | /applications/:id/details       | GET    |
+| Save student info       | /applications/:id/student-info  | POST   |
+| Save parent info        | /applications/:id/parent-info   | POST   |
+| Save academic info      | /applications/:id/academic-info | POST   |
+| Upload documents        | /applications/:id/documents     | POST   |
+| Submit application      | /applications/:id/submit        | POST   |
+| Resume draft            | /applications/:id/resume        | GET    |
+| Get schools             | /schools                        | GET    |
+| Get school              | /schools/:id                    | GET    |
+| Create school           | /schools                        | POST   |
 
 ---
 

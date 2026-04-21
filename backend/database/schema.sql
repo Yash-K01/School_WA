@@ -1706,5 +1706,57 @@ CREATE INDEX IF NOT EXISTS idx_lead_school_status_date ON lead(
   last_contacted_at DESC
 );
 -- ============================================================================
+-- TABLE: CAMPUS_VISIT (Campus Visit Scheduling & Tracking)
+-- ============================================================================
+-- Stores campus visit schedules linked to leads, with counselor assignment
+-- and slot-based double-booking prevention.
+
+-- 1. Define the status enum if not already done
+DO $$ BEGIN
+    CREATE TYPE visit_status AS ENUM ('scheduled', 'completed', 'cancelled', 'no_show');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE campus_visit (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+  lead_id BIGINT REFERENCES lead(id) ON DELETE SET NULL,
+
+  -- Visit Schedule (Using specific types for easier frontend filtering)
+  visit_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+
+  -- Visitor Information (For Auto-fill requirement)
+  -- We store these even if we have lead_id to keep a historical record
+  visitor_name VARCHAR(255) NOT NULL,
+  visitor_phone VARCHAR(20) NOT NULL,
+  student_name VARCHAR(255), -- Added to match "Auto-fill student name" requirement
+
+  -- Context & Notes
+  tour_preferences TEXT,
+  internal_notes TEXT,
+  status visit_status DEFAULT 'scheduled',
+  visit_type VARCHAR(50) DEFAULT 'campus_visit',
+
+  -- Audit & Assignment
+  created_by BIGINT, -- Links to staff/user table
+  assigned_to BIGINT, -- The Counselor
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  -- IMPROVED CONSTRAINT: Prevent a specific counselor from being double-booked,
+  -- but allow the school to have multiple visits at the same time with different staff.
+  CONSTRAINT unique_counselor_slot
+  UNIQUE (school_id, assigned_to, visit_date, start_time)
+);
+
+-- Index for the "Counselor Workspace" dashboard (Speed up date-based lookups)
+CREATE INDEX idx_campus_visit_dashboard
+ON campus_visit(school_id, visit_date, status);
+
+-- ============================================================================
 -- SQL Script ends
 -- ============================================================================

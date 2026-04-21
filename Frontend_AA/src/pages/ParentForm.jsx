@@ -120,9 +120,7 @@ export default function ParentForm({
         initialData.motherOccupation ||
         f.motherOccupation,
       guardianName:
-        initialData.guardian_name ||
-        initialData.guardianName ||
-        f.guardianName,
+        initialData.guardian_name || initialData.guardianName || f.guardianName,
       guardianRelation:
         initialData.guardian_relation ||
         initialData.guardianRelation ||
@@ -147,16 +145,16 @@ export default function ParentForm({
         initialData.primary_contact_phone ||
         initialData.primaryContactPhone ||
         f.primaryContactPhone,
-        address: initialData.address || f.address,
-        city: initialData.city || f.city,
-        state: initialData.state || f.state,
-        postalCode:
-          initialData.postal_code || initialData.postalCode || f.postalCode,
-        incomeRange:
-          initialData.income_range || initialData.incomeRange || f.incomeRange,
-      }));
+      address: initialData.address || f.address,
+      city: initialData.city || f.city,
+      state: initialData.state || f.state,
+      postalCode:
+        initialData.postal_code || initialData.postalCode || f.postalCode,
+      incomeRange:
+        initialData.income_range || initialData.incomeRange || f.incomeRange,
+    }));
 
-      console.log("✅ [ParentForm] Loaded parent data successfully");
+    console.log("✅ [ParentForm] Loaded parent data successfully");
   }, [initialData]);
 
   // Validation logic
