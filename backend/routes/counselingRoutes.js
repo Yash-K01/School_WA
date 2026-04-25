@@ -1,7 +1,8 @@
 /**
  * routes/counselingRoutes.js
  * API routes for Counseling Workspace
- * All routes require authentication and counselor role
+ * All routes require authentication
+ * Base path: /api/counseling
  */
 
 import express from 'express';
@@ -18,10 +19,13 @@ router.get('/stats', counselingController.getDashboardStats);
 
 // Campus visit management
 router.get('/visits', counselingController.getVisits);
-router.post('/campus-visits', counselingController.createCampusVisit);
-router.get('/campus-visits/:id', counselingController.getCampusVisit);
-router.put('/campus-visits/:id', counselingController.updateCampusVisit);
-router.delete('/campus-visits/:id', counselingController.deleteCampusVisit);
+router.post('/visits', counselingController.createCampusVisit);
+router.get('/visits/:id', counselingController.getCampusVisit);
+router.put('/visits/:id', counselingController.updateCampusVisit);
+router.delete('/visits/:id', counselingController.deleteCampusVisit);
+
+// Time slot availability
+router.get('/slots', counselingController.getTimeSlotAvailability);
 
 // Lead search (for auto-fill in visit creation)
 router.get('/leads/search', counselingController.searchLeads);

@@ -106,23 +106,57 @@ export const searchLeads = async (req, res) => {
 };
 
 /**
- * POST /api/campus-visits
- * Create a new campus visit
- * Body: { lead_id, student_name, grade, visit_date, visit_time, notes (optional) }
- * Constraint: Counselor can't have multiple visits at the same time slot
- * Returns: Created visit object
+ * POST /api/counseling/visits
+ * Create a new campus visit with auto-fill from lead if provided
+ * 
+ * Body: {
+ *   lead_id,
+ *   assigned_to,
+ *   visitor_name,
+ *   visitor_phone,
+ *   student_name,
+ *   grade,
+ *   number_of_visitors,
+ *   visit_date,
+ *   start_time,
+ *   end_time,
+ *   visit_type,
+ *   areas_of_interest (array),
+ *   special_requirements,
+ *   internal_notes
+ * }
+ * 
+ * Logic:
+ * - If lead_id exists: fetch lead and auto-fill missing fields
+ * - Default number_of_visitors = 1 if not provided
+ * - Check double-booking constraint
+ * - Parse tour_preferences as JSON
  */
 export const createCampusVisit = async (req, res) => {
   try {
     const { school_id } = req.user;
     const counselorId = req.user.id;
-    const { lead_id, student_name, grade, visit_date, visit_time, notes } = req.body;
+    let {
+      lead_id,
+      visitor_name,
+      visitor_phone,
+      student_name,
+      grade,
+      number_of_visitors,
+      visit_date,
+      start_time,
+      end_time,
+      visit_type,
+      areas_of_interest,
+      special_requirements,
+      internal_notes,
+    } = req.body;
 
     // Validate required fields
-    if (!lead_id || !student_name || !grade || !visit_date || !visit_time) {
+    if (!visit_date || !start_time || !end_time) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: lead_id, student_name, grade, visit_date, visit_time',
+        message: 'Missing required fields: visit_date, start_time, end_time',
       });
     }
 
@@ -135,15 +169,15 @@ export const createCampusVisit = async (req, res) => {
     }
 
     // Validate time format (HH:MM)
-    if (!/^\d{2}:\d{2}$/.test(visit_time)) {
+    if (!/^\d{2}:\d{2}$/.test(start_time) || !/^\d{2}:\d{2}$/.test(end_time)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid visit_time format. Use HH:MM',
+        message: 'Invalid time format. Use HH:MM',
       });
     }
 
     // Validate that the visit date is not in the past
-    const visitDateTime = new Date(`${visit_date}T${visit_time}`);
+    const visitDateTime = new Date(`${visit_date}T${start_time}`);
     if (visitDateTime < new Date()) {
       return res.status(400).json({
         success: false,
@@ -151,28 +185,83 @@ export const createCampusVisit = async (req, res) => {
       });
     }
 
-    // Verify the lead belongs to this counselor
-    const leadResult = await pool.query(
-      'SELECT id FROM lead WHERE id = $1 AND school_id = $2 AND assigned_to = $3',
-      [lead_id, school_id, counselorId]
-    );
+    // Auto-fill from lead if lead_id provided
+    if (lead_id) {
+      const leadResult = await pool.query(
+        `SELECT 
+          id, first_name, last_name, email, phone, desired_class
+         FROM lead 
+         WHERE id = $1 AND school_id = $2 AND assigned_to = $3`,
+        [lead_id, school_id, counselorId]
+      );
 
-    if (leadResult.rows.length === 0) {
-      return res.status(403).json({
+      if (leadResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Lead not found or not assigned to you',
+        });
+      }
+
+      const lead = leadResult.rows[0];
+
+      // Auto-fill missing fields from lead data
+      if (!visitor_name) {
+        visitor_name = `${lead.first_name} ${lead.last_name}`.trim();
+      }
+      if (!visitor_phone) {
+        visitor_phone = lead.phone;
+      }
+      if (!student_name) {
+        student_name = `${lead.first_name} ${lead.last_name}`.trim();
+      }
+      if (!grade && lead.desired_class) {
+        grade = lead.desired_class;
+      }
+    }
+
+    // Set defaults
+    if (!number_of_visitors) {
+      number_of_visitors = 1;
+    }
+
+    // Validate number_of_visitors
+    if (number_of_visitors < 1) {
+      return res.status(400).json({
         success: false,
-        message: 'Lead not found or not assigned to you',
+        message: 'number_of_visitors must be at least 1',
       });
     }
 
+    // Validate phone format if provided
+    if (visitor_phone && !/^\d{10}$/.test(visitor_phone.replace(/\D/g, ''))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone format',
+      });
+    }
+
+    // Parse tour preferences
+    const tour_preferences = JSON.stringify({
+      areas: areas_of_interest || [],
+      special_requirements: special_requirements || '',
+    });
+
+    // Create visit
     const visit = await counselingQueries.createCampusVisit({
       school_id,
-      lead_id,
-      counselor_id: counselorId,
+      lead_id: lead_id || null,
+      assigned_to: counselorId,
+      visitor_name,
+      visitor_phone,
       student_name,
-      grade,
+      grade: grade || null,
+      number_of_visitors,
       visit_date,
-      visit_time,
-      notes: notes || null,
+      start_time,
+      end_time,
+      visit_type: visit_type || 'campus_visit',
+      internal_notes: internal_notes || null,
+      tour_preferences,
     });
 
     return res.status(201).json({
@@ -234,9 +323,10 @@ export const getCampusVisit = async (req, res) => {
 };
 
 /**
- * PUT /api/campus-visits/:id
+ * PUT /api/counseling/visits/:id
  * Update a campus visit
- * Body: { student_name, grade, visit_date, visit_time, status, notes }
+ * Body: { visitor_name, visitor_phone, student_name, grade, number_of_visitors,
+ *         visit_date, start_time, end_time, assigned_to, status, internal_notes, tour_preferences }
  * (Only provided fields will be updated)
  * Returns: Updated visit object
  */
@@ -256,7 +346,7 @@ export const updateCampusVisit = async (req, res) => {
       });
     }
 
-    // Validate date and time if provided
+    // Validate date and times if provided
     if (updates.visit_date && !/^\d{4}-\d{2}-\d{2}$/.test(updates.visit_date)) {
       return res.status(400).json({
         success: false,
@@ -264,10 +354,25 @@ export const updateCampusVisit = async (req, res) => {
       });
     }
 
-    if (updates.visit_time && !/^\d{2}:\d{2}$/.test(updates.visit_time)) {
+    if (updates.start_time && !/^\d{2}:\d{2}$/.test(updates.start_time)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid visit_time format. Use HH:MM',
+        message: 'Invalid start_time format. Use HH:MM',
+      });
+    }
+
+    if (updates.end_time && !/^\d{2}:\d{2}$/.test(updates.end_time)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid end_time format. Use HH:MM',
+      });
+    }
+
+    // Validate number_of_visitors if provided
+    if (updates.number_of_visitors && updates.number_of_visitors < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'number_of_visitors must be at least 1',
       });
     }
 
@@ -294,7 +399,7 @@ export const updateCampusVisit = async (req, res) => {
 };
 
 /**
- * DELETE /api/campus-visits/:id
+ * DELETE /api/counseling/visits/:id
  * Delete a campus visit (soft delete via status = 'cancelled')
  * Returns: { success: true, message }
  */
@@ -324,6 +429,51 @@ export const deleteCampusVisit = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to delete campus visit',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/counseling/slots?date=YYYY-MM-DD
+ * Get time slot availability for a specific date
+ * Groups visits by start_time and counts total visits at each slot
+ * 
+ * Query params: date=YYYY-MM-DD (required)
+ * 
+ * Returns: Array of { start_time, total_visits }
+ */
+export const getTimeSlotAvailability = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const { date } = req.query;
+
+    // Validate date parameter
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date parameter (date) is required. Format: YYYY-MM-DD',
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Use YYYY-MM-DD',
+      });
+    }
+
+    const slots = await counselingQueries.getTimeSlotAvailability(school_id, date);
+
+    return res.json({
+      success: true,
+      data: slots || [],
+    });
+  } catch (error) {
+    console.error('Error in getTimeSlotAvailability:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch time slot availability',
       error: error.message,
     });
   }

@@ -34,12 +34,13 @@ This is the complete, authoritative API documentation for the School ERP system.
 2. [Leads API](#leads-api)
 3. [Applications API](#applications-api)
 4. [Schools API](#schools-api)
-5. [Flow Diagrams](#application-flow-diagrams)
-6. [Data Mapping](#data-mapping-lead--application)
-7. [Auto-Fill Implementation](#frontend-auto-fill-implementation)
-8. [Common Issues](#common-issues--debugging)
-9. [Error Handling](#error-handling)
-10. [Quick Reference](#quick-reference)
+5. [Counseling API](#counseling-api)
+6. [Flow Diagrams](#application-flow-diagrams)
+7. [Data Mapping](#data-mapping-lead--application)
+8. [Auto-Fill Implementation](#frontend-auto-fill-implementation)
+9. [Common Issues](#common-issues--debugging)
+10. [Error Handling](#error-handling)
+11. [Quick Reference](#quick-reference)
 
 ---
 
@@ -1197,6 +1198,98 @@ Authorization: Bearer <token>
     "status": "active"
   },
   "message": "School created successfully"
+}
+```
+
+---
+
+## Counseling API
+
+### GET /api/counseling/stats
+
+**Purpose:** Get dashboard statistics for counselor including pending tasks
+
+**Does:**
+
+- Returns assignedLeads, upcomingVisits, pendingTasks
+- Fetches tasks where `is_done = FALSE`
+
+**Request:**
+
+```
+GET /api/counseling/stats
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "assignedLeads": 15,
+    "upcomingVisits": 3,
+    "pendingTasks": 2
+  }
+}
+```
+
+---
+
+### GET /api/counseling/visits
+
+**Purpose:** Get counselor campus visits
+
+**Does:**
+
+- Returns array of visit objects
+- Optional query `filterToday=true` to get only today's visits
+
+**Request:**
+
+```
+GET /api/counseling/visits?filterToday=true
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "lead_id": 456,
+      "visit_date": "2026-04-21",
+      "visit_time": "14:00"
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/counseling/campus-visits
+
+**Purpose:** Schedule new campus visit
+
+**Does:**
+
+- Creates visit tied to lead and counselor
+- Validates double-booking
+- Returns created visit object
+
+**Request:**
+
+```json
+{
+  "lead_id": 456,
+  "student_name": "Rajesh Kumar",
+  "grade": "Grade 5",
+  "visit_date": "2026-04-25",
+  "visit_time": "10:30",
+  "notes": "First visit"
 }
 ```
 

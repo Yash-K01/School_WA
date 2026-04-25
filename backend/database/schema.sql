@@ -1733,6 +1733,8 @@ CREATE TABLE campus_visit (
   visitor_name VARCHAR(255) NOT NULL,
   visitor_phone VARCHAR(20) NOT NULL,
   student_name VARCHAR(255), -- Added to match "Auto-fill student name" requirement
+  grade VARCHAR(50),
+  number_of_visitors INT DEFAULT 1,
 
   -- Context & Notes
   tour_preferences TEXT,

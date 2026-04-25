@@ -155,7 +155,8 @@ export const searchLeads = async (schoolId, counselorId, query) => {
  * Create a new campus visit with unique_counselor_slot constraint check
  * Constraint: One counselor can't have multiple visits at the same time
  * @param {Object} data - Visit data { school_id, lead_id, assigned_to, visitor_name, visitor_phone,
- *                        student_name, visit_date, start_time, end_time, internal_notes, tour_preferences }
+ *                        student_name, grade, number_of_visitors, visit_date, start_time, end_time,
+ *                        visit_type, internal_notes, tour_preferences }
  * @returns {Promise<Object>} The newly created visit record
  */
 export const createCampusVisit = async (data) => {
@@ -166,9 +167,12 @@ export const createCampusVisit = async (data) => {
     visitor_name,
     visitor_phone,
     student_name,
+    grade,
+    number_of_visitors,
     visit_date,
     start_time,
     end_time,
+    visit_type,
     internal_notes,
     tour_preferences,
   } = data;
@@ -178,7 +182,7 @@ export const createCampusVisit = async (data) => {
     SELECT id FROM campus_visit
     WHERE school_id = $1 
       AND assigned_to = $2 
-      AND DATE(visit_date) = $3 
+      AND visit_date = $3 
       AND start_time = $4
       AND status NOT IN ('cancelled', 'no_show')
     LIMIT 1
@@ -201,8 +205,9 @@ export const createCampusVisit = async (data) => {
   const insertSql = `
     INSERT INTO campus_visit (
       school_id, lead_id, assigned_to, visitor_name, visitor_phone, student_name,
-      visit_date, start_time, end_time, status, internal_notes, tour_preferences, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+      grade, number_of_visitors, visit_date, start_time, end_time, visit_type,
+      status, internal_notes, tour_preferences, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
     RETURNING *;
   `;
 
@@ -213,9 +218,12 @@ export const createCampusVisit = async (data) => {
     visitor_name,
     visitor_phone,
     student_name,
+    grade,
+    number_of_visitors,
     visit_date,
     start_time,
     end_time,
+    visit_type,
     'scheduled',
     internal_notes,
     tour_preferences,
@@ -235,7 +243,7 @@ export const createCampusVisit = async (data) => {
 export const getCampusVisitById = async (id, schoolId, counselorId) => {
   const sql = `
     SELECT * FROM campus_visit 
-    WHERE id = $1 AND school_id = $2 AND assigned_to  = $3
+    WHERE id = $1 AND school_id = $2 AND assigned_to = $3
   `;
 
   const result = await pool.query(sql, [id, schoolId, counselorId]);
@@ -248,11 +256,14 @@ export const getCampusVisitById = async (id, schoolId, counselorId) => {
  * @param {Number} id - Visit ID
  * @param {Number} schoolId - School ID
  * @param {Number} counselorId - Counselor ID (assigned_to)
- * @param {Object} updates - Fields to update { visitor_name, visitor_phone, student_name, visit_date, start_time, end_time, status, internal_notes, tour_preferences }
+ * @param {Object} updates - Fields to update { visitor_name, visitor_phone, student_name, grade,
+ *                           number_of_visitors, visit_date, start_time, end_time, assigned_to,
+ *                           visit_type, status, internal_notes, tour_preferences }
  * @returns {Promise<Object>} Updated visit record
  */
 export const updateCampusVisit = async (id, schoolId, counselorId, updates) => {
-  const allowedFields = ['visitor_name', 'visitor_phone', 'student_name', 'visit_date', 'start_time', 'end_time', 'status', 'internal_notes', 'tour_preferences'];
+  const allowedFields = ['visitor_name', 'visitor_phone', 'student_name', 'grade', 'number_of_visitors',
+    'visit_date', 'start_time', 'end_time', 'assigned_to', 'visit_type', 'status', 'internal_notes', 'tour_preferences'];
   const updateFields = [];
   const params = [id, schoolId, counselorId];
 
@@ -290,8 +301,34 @@ export const deleteCampusVisit = async (id, schoolId, counselorId) => {
   const sql = `
     UPDATE campus_visit
     SET status = 'cancelled', updated_at = NOW()
-    WHERE id = $1 AND school_id = $2 AND assigned_to  = $3
+    WHERE id = $1 AND school_id = $2 AND assigned_to = $3
   `;
 
   await pool.query(sql, [id, schoolId, counselorId]);
+};
+
+/**
+ * getTimeSlotAvailability(schoolId, date)
+ * Get time slot availability for a specific date
+ * Groups visits by start_time and counts total visits at each slot
+ * Excludes cancelled visits
+ * @param {Number} schoolId - School ID
+ * @param {String} date - Visit date (YYYY-MM-DD format)
+ * @returns {Promise<Array>} Array of { start_time, total_visits }
+ */
+export const getTimeSlotAvailability = async (schoolId, date) => {
+  const sql = `
+    SELECT 
+      start_time,
+      COUNT(*) as total_visits
+    FROM campus_visit
+    WHERE school_id = $1
+      AND visit_date = $2
+      AND status != 'cancelled'
+    GROUP BY start_time
+    ORDER BY start_time ASC
+  `;
+
+  const result = await pool.query(sql, [schoolId, date]);
+  return result.rows;
 };
