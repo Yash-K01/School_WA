@@ -84,7 +84,7 @@ export function useCreateAdmission() {
 
       const isFormData = payload instanceof FormData
       const headers = {
-        'Authorization': `Bearer ${sessionStorage.getItem('auth_token') || ''}`
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
       }
 
       // Don't set Content-Type for FormData - let browser set it with boundary

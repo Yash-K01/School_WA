@@ -1758,5 +1758,43 @@ CREATE INDEX idx_campus_visit_dashboard
 ON campus_visit(school_id, visit_date, status);
 
 -- ============================================================================
+-- TABLE: TASK
+-- ============================================================================
+-- Create the Task table
+CREATE TABLE task (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+  assigned_to BIGINT NOT NULL, -- Links to your staff/user table
+  
+  -- Task Content
+  title VARCHAR(255) NOT NULL,
+  task_description TEXT,
+  priority VARCHAR(20) CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+  
+  -- Status and Deadlines
+  is_done BOOLEAN DEFAULT FALSE,
+  due_date DATE DEFAULT CURRENT_DATE,
+  
+  -- Tracking
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for the "Counselor Workspace" to load pending tasks instantly
+CREATE INDEX idx_task_workspace ON task(school_id, assigned_to, is_done, due_date);
+
+-- Insert a High Priority follow-up
+INSERT INTO task (school_id, assigned_to, title, priority, due_date)
+VALUES (1, 5, 'Follow-up with 5 hot leads', 'high', CURRENT_DATE);
+
+-- Insert a Medium Priority admin task
+INSERT INTO task (school_id, assigned_to, title, priority, due_date)
+VALUES (1, 5, 'Prepare tour schedule for next week', 'medium', CURRENT_DATE + 1);
+
+-- Insert a Completed task
+INSERT INTO task (school_id, assigned_to, title, priority, is_done)
+VALUES (1, 5, 'Send weekly report', 'low', TRUE);
+
+-- ============================================================================
 -- SQL Script ends
 -- ============================================================================

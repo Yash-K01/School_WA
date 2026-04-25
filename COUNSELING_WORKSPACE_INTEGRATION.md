@@ -3,14 +3,17 @@
 ## ✅ Files Created
 
 ### Backend Files
+
 - ✅ `backend/db/queries/counselingQueries.js` - Database queries layer
 - ✅ `backend/controllers/counselingController.js` - Business logic layer
 - ✅ `backend/routes/counselingRoutes.js` - Express routes
 
 ### Frontend Files
+
 - ✅ `Frontend_AA/src/services/CounselingService.js` - API client service
 
 ### Documentation Files
+
 - ✅ `COUNSELING_WORKSPACE_IMPLEMENTATION.md` - Complete implementation guide
 
 ---
@@ -25,16 +28,17 @@ Locate your existing route imports and add:
 
 ```javascript
 // Add this import with your other route imports
-import counselingRoutes from './routes/counselingRoutes.js';
+import counselingRoutes from "./routes/counselingRoutes.js";
 
 // Then add this line to register the routes (after your other app.use routes)
 // Example location: after other API routes like leadRoutes, applicationRoutes, etc.
-app.use('/api', counselingRoutes);
+app.use("/api", counselingRoutes);
 ```
 
 **Alternative**: If you have a centralized route registration, add:
+
 ```javascript
-app.use('/api/counseling', counselingRoutes);
+app.use("/api/counseling", counselingRoutes);
 ```
 
 ### Step 2: Verify Database Tables
@@ -42,9 +46,10 @@ app.use('/api/counseling', counselingRoutes);
 Ensure these tables exist in your database schema:
 
 **Table: campus_visit**
+
 ```sql
 -- Check if table exists
-SELECT * FROM information_schema.tables 
+SELECT * FROM information_schema.tables
 WHERE table_schema = 'public' AND table_name = 'campus_visit';
 
 -- If not, create it:
@@ -67,12 +72,15 @@ CREATE TABLE campus_visit (
 ```
 
 **Table: lead** (must already exist)
+
 - Required columns: `id`, `school_id`, `first_name`, `last_name`, `phone`, `email`, `desired_class`, `assigned_to`
 
 **Table: parent_detail** (must already exist)
+
 - Required columns: `lead_id`, `parent_name`, `parent_phone`
 
 **Table: task** (for dashboard stats - must already exist)
+
 - Required columns: `id`, `school_id`, `assigned_to`, `status`
 
 ### Step 3: Create Database Indexes
@@ -81,17 +89,17 @@ Run these SQL commands to create performance indexes:
 
 ```sql
 -- Index for dashboard queries (visit list and statistics)
-CREATE INDEX IF NOT EXISTS idx_campus_visit_dashboard 
+CREATE INDEX IF NOT EXISTS idx_campus_visit_dashboard
 ON campus_visit(school_id, counselor_id, visit_date)
 WHERE status NOT IN ('cancelled', 'no_show');
 
 -- Index for double-booking prevention
-CREATE INDEX IF NOT EXISTS idx_campus_visit_slot 
+CREATE INDEX IF NOT EXISTS idx_campus_visit_slot
 ON campus_visit(school_id, counselor_id, visit_date, visit_time)
 WHERE status NOT IN ('cancelled', 'no_show');
 
 -- Index for lead search
-CREATE INDEX IF NOT EXISTS idx_lead_assigned 
+CREATE INDEX IF NOT EXISTS idx_lead_assigned
 ON lead(school_id, assigned_to)
 WHERE assigned_to IS NOT NULL;
 ```
@@ -99,6 +107,7 @@ WHERE assigned_to IS NOT NULL;
 ### Step 4: Frontend Setup (Optional - if building UI components)
 
 The `CounselingService.js` file is already created in:
+
 ```
 Frontend_AA/src/services/CounselingService.js
 ```
@@ -106,7 +115,7 @@ Frontend_AA/src/services/CounselingService.js
 This service handles all API communication. Use it in your React components:
 
 ```javascript
-import CounselingService from '@/services/CounselingService';
+import CounselingService from "@/services/CounselingService";
 
 // Example usage in a component
 function CounselingDashboard() {
@@ -114,8 +123,8 @@ function CounselingDashboard() {
 
   React.useEffect(() => {
     CounselingService.getDashboardStats()
-      .then(res => res.success && setStats(res.data))
-      .catch(error => console.error(error));
+      .then((res) => res.success && setStats(res.data))
+      .catch((error) => console.error(error));
   }, []);
 
   return stats ? (
@@ -125,7 +134,9 @@ function CounselingDashboard() {
       <p>Upcoming Visits: {stats.upcomingVisits}</p>
       <p>Pending Tasks: {stats.pendingTasks}</p>
     </div>
-  ) : <p>Loading...</p>;
+  ) : (
+    <p>Loading...</p>
+  );
 }
 ```
 
@@ -136,9 +147,11 @@ function CounselingDashboard() {
 Once integrated, the following endpoints will be available:
 
 ### Dashboard
+
 - `GET /api/counseling/stats` - Get dashboard statistics
 
 ### Campus Visits
+
 - `GET /api/counseling/visits` - Get all visits (optional: ?filterToday=true)
 - `POST /api/campus-visits` - Create new visit
 - `GET /api/campus-visits/:id` - Get single visit
@@ -146,6 +159,7 @@ Once integrated, the following endpoints will be available:
 - `DELETE /api/campus-visits/:id` - Cancel visit
 
 ### Lead Search
+
 - `GET /api/counseling/leads/search?q=search_term` - Search assigned leads
 
 ---
@@ -155,12 +169,14 @@ Once integrated, the following endpoints will be available:
 ### Backend Testing
 
 **1. Start Server**
+
 ```bash
 cd backend
 npm start
 ```
 
 **2. Test Dashboard Endpoint**
+
 ```bash
 curl -X GET http://localhost:5001/api/counseling/stats \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
@@ -168,12 +184,14 @@ curl -X GET http://localhost:5001/api/counseling/stats \
 ```
 
 **3. Test Lead Search**
+
 ```bash
 curl -X GET "http://localhost:5001/api/counseling/leads/search?q=john" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 **4. Test Create Visit**
+
 ```bash
 curl -X POST http://localhost:5001/api/campus-visits \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
@@ -191,9 +209,10 @@ curl -X POST http://localhost:5001/api/campus-visits \
 ### Frontend Testing
 
 **1. In Browser Console**
+
 ```javascript
 // Import the service
-import CounselingService from '@/services/CounselingService';
+import CounselingService from "@/services/CounselingService";
 
 // Test dashboard stats
 await CounselingService.getDashboardStats();
@@ -202,7 +221,7 @@ await CounselingService.getDashboardStats();
 await CounselingService.getVisits();
 
 // Test lead search
-await CounselingService.searchLeads('john');
+await CounselingService.searchLeads("john");
 ```
 
 ---
@@ -225,27 +244,35 @@ await CounselingService.searchLeads('john');
 ## 📝 Common Integration Issues & Solutions
 
 ### Issue: "Cannot find module 'counselingRoutes'"
+
 **Solution**: Verify the import path is correct:
+
 ```javascript
-import counselingRoutes from './routes/counselingRoutes.js';
+import counselingRoutes from "./routes/counselingRoutes.js";
 ```
 
 ### Issue: "Counseling endpoints not responding"
-**Solution**: 
+
+**Solution**:
+
 1. Check routes are registered: `app.use('/api', counselingRoutes);`
 2. Check server is running: `npm start`
 3. Verify JWT token in Authorization header
 
 ### Issue: Database errors
-**Solution**: 
+
+**Solution**:
+
 1. Verify tables exist: `SELECT * FROM campus_visit;`
 2. Run migration/schema SQL if needed
 3. Check database connection in app.js
 
 ### Issue: "CounselingService is not a module"
+
 **Solution**: Ensure you're importing as singleton:
+
 ```javascript
-import CounselingService from '@/services/CounselingService';
+import CounselingService from "@/services/CounselingService";
 ```
 
 ---
@@ -255,6 +282,7 @@ import CounselingService from '@/services/CounselingService';
 For detailed documentation, see: [COUNSELING_WORKSPACE_IMPLEMENTATION.md](./COUNSELING_WORKSPACE_IMPLEMENTATION.md)
 
 Key sections:
+
 - Backend Components Overview
 - API Endpoints Reference
 - Usage Examples
@@ -287,6 +315,7 @@ Frontend:
 ## 📞 Support
 
 If you encounter issues:
+
 1. Check the integration checklist above
 2. Review the detailed documentation in COUNSELING_WORKSPACE_IMPLEMENTATION.md
 3. Verify database table structure matches requirements

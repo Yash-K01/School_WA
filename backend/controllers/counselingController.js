@@ -6,7 +6,6 @@
  */
 
 import * as counselingQueries from '../db/queries/counselingQueries.js';
-import * as leadsQueries from '../db/queries/leadsQueries.js';
 import pool from '../config/db.js';
 
 /**

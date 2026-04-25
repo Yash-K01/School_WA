@@ -3,15 +3,19 @@
  * Utility functions for managing JWT authentication tokens
  */
 
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY = 'token';
 const USER_KEY = 'user_data';
 
 /**
- * Get token from sessionStorage
+ * Get token from localStorage
  */
 export const getToken = () => {
   try {
-    return sessionStorage.getItem(TOKEN_KEY);
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      console.log('🔐 [TOKEN] Retrieved token from localStorage');
+    }
+    return token;
   } catch (error) {
     console.error('Error getting token:', error);
     return null;
@@ -19,12 +23,13 @@ export const getToken = () => {
 };
 
 /**
- * Set token in sessionStorage
+ * Set token in localStorage
  */
 export const setToken = (token) => {
   try {
     if (token) {
-      sessionStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(TOKEN_KEY, token);
+      console.log('🔐 [TOKEN] Stored token in localStorage');
     }
   } catch (error) {
     console.error('Error setting token:', error);
@@ -32,12 +37,13 @@ export const setToken = (token) => {
 };
 
 /**
- * Remove token from sessionStorage
+ * Remove token from localStorage
  */
 export const clearToken = () => {
   try {
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    console.log('🔐 [TOKEN] Cleared token from localStorage');
   } catch (error) {
     console.error('Error clearing token:', error);
   }
@@ -51,11 +57,11 @@ export const isAuthenticated = () => {
 };
 
 /**
- * Get user data from sessionStorage
+ * Get user data from localStorage
  */
 export const getUserData = () => {
   try {
-    const userData = sessionStorage.getItem(USER_KEY);
+    const userData = localStorage.getItem(USER_KEY);
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
     console.error('Error getting user data:', error);
@@ -64,12 +70,12 @@ export const getUserData = () => {
 };
 
 /**
- * Set user data in sessionStorage
+ * Set user data in localStorage
  */
 export const setUserData = (userData) => {
   try {
     if (userData) {
-      sessionStorage.setItem(USER_KEY, JSON.stringify(userData));
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
     }
   } catch (error) {
     console.error('Error setting user data:', error);

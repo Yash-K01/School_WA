@@ -27,14 +27,13 @@ export const getDashboardStats = async (schoolId, counselorId) => {
       // Count upcoming visits (today and future) using idx_campus_visit_dashboard index
       pool.query(
         `SELECT COUNT(*) as count FROM campus_visit 
-         WHERE school_id = $1 AND counselor_id = $2 AND visit_date >= CURRENT_DATE 
-         ORDER BY visit_date ASC`,
+WHERE school_id = $1 AND assigned_to = $2 AND visit_date >= CURRENT_DATE;`,
         [schoolId, counselorId]
       ),
       // Count pending tasks (not completed)
       pool.query(
         `SELECT COUNT(*) as count FROM task 
-         WHERE school_id = $1 AND assigned_to = $2 AND status != 'completed'`,
+WHERE school_id = $1 AND assigned_to = $2 AND is_done = FALSE`,
         [schoolId, counselorId]
       ),
     ]);
@@ -65,11 +64,14 @@ export const getVisitsForCounselor = async (schoolId, counselorId, filterToday =
       cv.id,
       cv.lead_id,
       cv.student_name,
-      cv.grade,
+      cv.visitor_name,
+      cv.visitor_phone,
       cv.visit_date,
-      cv.visit_time,
+      cv.start_time,
+      cv.end_time,
       cv.status,
-      cv.notes,
+      cv.internal_notes,
+      cv.tour_preferences,
       l.first_name,
       l.last_name,
       l.phone,
@@ -77,7 +79,7 @@ export const getVisitsForCounselor = async (schoolId, counselorId, filterToday =
       l.desired_class
     FROM campus_visit cv
     LEFT JOIN lead l ON cv.lead_id = l.id
-    WHERE cv.school_id = $1 AND cv.counselor_id = $2
+    WHERE cv.school_id = $1 AND cv.assigned_to = $2
   `;
 
   const params = [schoolId, counselorId];
@@ -86,7 +88,7 @@ export const getVisitsForCounselor = async (schoolId, counselorId, filterToday =
     sql += ` AND DATE(cv.visit_date) = CURRENT_DATE`;
   }
 
-  sql += ` ORDER BY cv.visit_date ASC, cv.visit_time ASC`;
+  sql += ` ORDER BY cv.visit_date ASC, cv.start_time ASC`;
 
   const result = await pool.query(sql, params);
   return result.rows;
@@ -152,38 +154,41 @@ export const searchLeads = async (schoolId, counselorId, query) => {
  * createCampusVisit(data)
  * Create a new campus visit with unique_counselor_slot constraint check
  * Constraint: One counselor can't have multiple visits at the same time
- * @param {Object} data - Visit data { school_id, lead_id, counselor_id, student_name, grade, 
- *                        visit_date, visit_time, notes }
+ * @param {Object} data - Visit data { school_id, lead_id, assigned_to, visitor_name, visitor_phone,
+ *                        student_name, visit_date, start_time, end_time, internal_notes, tour_preferences }
  * @returns {Promise<Object>} The newly created visit record
  */
 export const createCampusVisit = async (data) => {
   const {
     school_id,
     lead_id,
-    counselor_id,
+    assigned_to,
+    visitor_name,
+    visitor_phone,
     student_name,
-    grade,
     visit_date,
-    visit_time,
-    notes,
+    start_time,
+    end_time,
+    internal_notes,
+    tour_preferences,
   } = data;
 
   // Check for double-booking: counselor already has a visit at this time
   const checkSql = `
     SELECT id FROM campus_visit
     WHERE school_id = $1 
-      AND counselor_id = $2 
+      AND assigned_to = $2 
       AND DATE(visit_date) = $3 
-      AND visit_time = $4
+      AND start_time = $4
       AND status NOT IN ('cancelled', 'no_show')
     LIMIT 1
   `;
 
   const checkResult = await pool.query(checkSql, [
     school_id,
-    counselor_id,
+    assigned_to,
     visit_date,
-    visit_time,
+    start_time,
   ]);
 
   if (checkResult.rows.length > 0) {
@@ -195,22 +200,25 @@ export const createCampusVisit = async (data) => {
   // Insert new visit
   const insertSql = `
     INSERT INTO campus_visit (
-      school_id, lead_id, counselor_id, student_name, grade, 
-      visit_date, visit_time, status, notes, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      school_id, lead_id, assigned_to, visitor_name, visitor_phone, student_name,
+      visit_date, start_time, end_time, status, internal_notes, tour_preferences, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
     RETURNING *;
   `;
 
   const result = await pool.query(insertSql, [
     school_id,
     lead_id,
-    counselor_id,
+    assigned_to,
+    visitor_name,
+    visitor_phone,
     student_name,
-    grade,
     visit_date,
-    visit_time,
+    start_time,
+    end_time,
     'scheduled',
-    notes,
+    internal_notes,
+    tour_preferences,
   ]);
 
   return result.rows[0];
@@ -227,7 +235,7 @@ export const createCampusVisit = async (data) => {
 export const getCampusVisitById = async (id, schoolId, counselorId) => {
   const sql = `
     SELECT * FROM campus_visit 
-    WHERE id = $1 AND school_id = $2 AND counselor_id = $3
+    WHERE id = $1 AND school_id = $2 AND assigned_to  = $3
   `;
 
   const result = await pool.query(sql, [id, schoolId, counselorId]);
@@ -239,12 +247,12 @@ export const getCampusVisitById = async (id, schoolId, counselorId) => {
  * Update a campus visit
  * @param {Number} id - Visit ID
  * @param {Number} schoolId - School ID
- * @param {Number} counselorId - Counselor ID
- * @param {Object} updates - Fields to update { student_name, grade, visit_date, visit_time, status, notes }
+ * @param {Number} counselorId - Counselor ID (assigned_to)
+ * @param {Object} updates - Fields to update { visitor_name, visitor_phone, student_name, visit_date, start_time, end_time, status, internal_notes, tour_preferences }
  * @returns {Promise<Object>} Updated visit record
  */
 export const updateCampusVisit = async (id, schoolId, counselorId, updates) => {
-  const allowedFields = ['student_name', 'grade', 'visit_date', 'visit_time', 'status', 'notes'];
+  const allowedFields = ['visitor_name', 'visitor_phone', 'student_name', 'visit_date', 'start_time', 'end_time', 'status', 'internal_notes', 'tour_preferences'];
   const updateFields = [];
   const params = [id, schoolId, counselorId];
 
@@ -262,7 +270,7 @@ export const updateCampusVisit = async (id, schoolId, counselorId, updates) => {
   const sql = `
     UPDATE campus_visit
     SET ${updateFields.join(', ')}, updated_at = NOW()
-    WHERE id = $1 AND school_id = $2 AND counselor_id = $3
+    WHERE id = $1 AND school_id = $2 AND assigned_to = $3
     RETURNING *;
   `;
 
@@ -282,7 +290,7 @@ export const deleteCampusVisit = async (id, schoolId, counselorId) => {
   const sql = `
     UPDATE campus_visit
     SET status = 'cancelled', updated_at = NOW()
-    WHERE id = $1 AND school_id = $2 AND counselor_id = $3
+    WHERE id = $1 AND school_id = $2 AND assigned_to  = $3
   `;
 
   await pool.query(sql, [id, schoolId, counselorId]);

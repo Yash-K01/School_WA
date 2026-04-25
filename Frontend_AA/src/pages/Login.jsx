@@ -33,8 +33,22 @@ export function Login() {
 
       if (data.success) {
         setSuccess("Login successful! Redirecting...");
+        console.log(
+          "✅ [LOGIN] Token received:",
+          data.data.token?.substring(0, 20) + "...",
+        );
         setToken(data.data.token);
         setUserData(data.data.user);
+
+        // Verify token was stored
+        const storedToken = localStorage.getItem("token");
+        console.log("✅ [LOGIN] Token stored in localStorage:", !!storedToken);
+        if (storedToken) {
+          console.log(
+            "✅ [LOGIN] Stored token preview:",
+            storedToken.substring(0, 20) + "...",
+          );
+        }
 
         setTimeout(() => {
           navigate("/leads");

@@ -1,88 +1,464 @@
 // ── Counseling.jsx ──────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Calendar, Clock, CheckSquare } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  Clock,
+  CheckSquare,
+  AlertCircle,
+  Loader,
+} from "lucide-react";
+import CounselingService from "../services/CounselingService.js";
 import "../style.css";
-
-const assignedLeads = [
-  { id:1, name:"Aarav Sharma", grade:"Grade 5", priority:"high",   nextAction:"Follow-up call", dueDate:"Today"    },
-  { id:2, name:"Diya Patel",   grade:"Grade 3", priority:"medium", nextAction:"Send brochure",  dueDate:"Tomorrow" },
-  { id:3, name:"Arjun Kumar",  grade:"Grade 8", priority:"high",   nextAction:"Campus tour",    dueDate:"Mar 5"    },
-];
-const visits = [
-  { id:1, student:"Ananya Singh", grade:"Grade 1", date:"Mar 3, 2026", time:"10:00 AM" },
-  { id:2, student:"Vihaan Reddy", grade:"Grade 6", date:"Mar 5, 2026", time:"2:00 PM"  },
-];
-const tasks = [
-  { id:1, task:"Follow-up with 5 hot leads",          priority:"high",   done:false },
-  { id:2, task:"Prepare tour schedule for next week", priority:"medium", done:false },
-  { id:3, task:"Send weekly report",                  priority:"low",    done:true  },
-];
 
 export function Counseling() {
   const navigate = useNavigate();
+
+  // ── State Management ──────────────────────────────────────
+  const [dashboardStats, setDashboardStats] = useState({
+    assignedLeads: 0,
+    upcomingVisits: 0,
+    pendingTasks: 0,
+  });
+
+  const [visits, setVisits] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // For debouncing search (300ms)
+  const searchTimeoutRef = useRef(null);
+
+  // ── Utility Functions ──────────────────────────────────────
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatTime = (timeString) => {
+    try {
+      const [hours, minutes] = timeString.split(":");
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    } catch {
+      return timeString;
+    }
+  };
+
+  // ── Data Fetching (useEffect) ──────────────────────────────
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch stats and today's visits in parallel
+        const [statsResponse, visitsResponse] = await Promise.all([
+          CounselingService.getDashboardStats(),
+          CounselingService.getVisits(true), // filterToday = true
+        ]);
+
+        // Handle stats response
+        if (statsResponse.success) {
+          setDashboardStats({
+            assignedLeads: statsResponse.data.assignedLeads || 0,
+            upcomingVisits: statsResponse.data.upcomingVisits || 0,
+            pendingTasks: statsResponse.data.pendingTasks || 0,
+          });
+        } else {
+          throw new Error(
+            statsResponse.message || "Failed to fetch dashboard stats",
+          );
+        }
+
+        // Handle visits response
+        if (visitsResponse.success) {
+          const formattedVisits = (visitsResponse.data || []).map((visit) => ({
+            id: visit.id,
+            student:
+              visit.student_name ||
+              `${visit.first_name || ""} ${visit.last_name || ""}`.trim(),
+            grade: visit.grade || "N/A",
+            date: formatDate(visit.visit_date),
+            time: formatTime(visit.visit_time),
+            leadId: visit.lead_id,
+            status: visit.status,
+          }));
+          setVisits(formattedVisits);
+        } else {
+          throw new Error(visitsResponse.message || "Failed to fetch visits");
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+
+        // Handle 401 Unauthorized - redirect to login
+        if (err.code === "UNAUTHORIZED" || err.status === 401) {
+          console.error("🔐 Authentication failed - redirecting to login");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user_data");
+          navigate("/login", { replace: true, state: { from: "/counseling" } });
+          return;
+        }
+
+        // Handle no token error
+        if (err.code === "NO_TOKEN") {
+          console.error("🔐 No token found - redirecting to login");
+          navigate("/login", { replace: true, state: { from: "/counseling" } });
+          return;
+        }
+
+        // Handle network error
+        if (err.code === "NETWORK_ERROR") {
+          setError(
+            "Cannot reach the server. Please check your connection and try again.",
+          );
+          setLoading(false);
+          return;
+        }
+
+        // Generic error message
+        setError(
+          err.message || "Failed to load dashboard data. Please try again.",
+        );
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // ── Debounced Search Function ──────────────────────────────
+  const handleSearchLeads = useCallback((query) => {
+    setSearchQuery(query);
+
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If query is empty, clear results
+    if (!query || query.trim() === "") {
+      setSearchResults([]);
+      return;
+    }
+
+    // Set new timeout with 300ms debounce
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await CounselingService.searchLeads(query);
+
+        if (response.success) {
+          const formattedLeads = (response.data || []).map((lead) => ({
+            id: lead.lead_id,
+            name: lead.student_name || "Unknown",
+            grade: lead.desired_class || "N/A",
+            priority: lead.follow_up_status === "hot" ? "high" : "medium",
+            nextAction: "Follow-up",
+            dueDate: lead.created_at
+              ? new Date(lead.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "Today",
+            phone: lead.phone,
+            email: lead.email,
+            parentName: lead.parent_name,
+            parentPhone: lead.parent_phone,
+          }));
+          setSearchResults(formattedLeads);
+        } else {
+          console.error("Search failed:", response.message);
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error("Error searching leads:", error);
+
+        // Handle 401 Unauthorized - redirect to login
+        if (error.code === "UNAUTHORIZED" || error.status === 401) {
+          console.error(
+            "🔐 Authentication failed during search - redirecting to login",
+          );
+          localStorage.removeItem("token");
+          localStorage.removeItem("user_data");
+          navigate("/login", { replace: true, state: { from: "/counseling" } });
+          return;
+        }
+
+        // Handle no token error
+        if (error.code === "NO_TOKEN") {
+          console.error(
+            "🔐 No token found during search - redirecting to login",
+          );
+          navigate("/login", { replace: true, state: { from: "/counseling" } });
+          return;
+        }
+
+        // For other errors, just clear results but stay on page
+        setSearchResults([]);
+      }
+    }, 300);
+  }, []);
+
+  // Display leads from search results
+  const displayLeads = searchResults;
+
+  // ── Render: Loading State ──────────────────────────────────
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Counselor Workspace</h1>
+            <p className="page-sub">Manage your leads and schedule</p>
+          </div>
+        </div>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "60px 20px",
+            color: "var(--gray-400)",
+          }}
+        >
+          <Loader
+            size={48}
+            style={{
+              animation: "spin 1s linear infinite",
+              margin: "0 auto 20px",
+            }}
+          />
+          <p style={{ fontSize: "16px", marginBottom: "10px" }}>
+            Loading your dashboard...
+          </p>
+          <p style={{ fontSize: "13px" }}>
+            Fetching your stats, visits, and assignments
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-header">
-        <div><h1 className="page-title">Counselor Workspace</h1><p className="page-sub">Manage your leads and schedule</p></div>
+        <div>
+          <h1 className="page-title">Counselor Workspace</h1>
+          <p className="page-sub">Manage your leads and schedule</p>
+        </div>
       </div>
 
+      {/* ── Error Alert ────────────────────────────────────── */}
+      {error && (
+        <div
+          style={{
+            backgroundColor: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgb(239, 68, 68)",
+            color: "rgb(220, 38, 38)",
+            padding: "12px 16px",
+            borderRadius: "6px",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "14px",
+          }}
+        >
+          <AlertCircle size={18} style={{ flexShrink: 0 }} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* ── Dashboard Stats Cards ──────────────────────────── */}
       <div className="grid-3 mb-5">
-        <div className="stat-card"><div className="stat-label">Assigned Leads</div><div className="stat-value">{assignedLeads.length}</div></div>
-        <div className="stat-card"><div className="stat-label">Pending Tasks</div><div className="stat-value" style={{color:"var(--orange)"}}>{tasks.filter(t=>!t.done).length}</div></div>
-        <div className="stat-card"><div className="stat-label">This Week's Tours</div><div className="stat-value" style={{color:"var(--blue)"}}>{visits.length}</div></div>
-      </div>
-
-      <div className="grid-2 mb-5">
-        <div className="card">
-          <div className="card-header"><div className="card-title">My Assigned Leads</div></div>
-          <div className="card-body">
-            {assignedLeads.map(l => (
-              <div className="assigned-lead-card" key={l.id}>
-                <div className="assigned-lead-top">
-                  <div><div className="assigned-lead-name">{l.name}</div><div className="assigned-lead-grade">{l.grade}</div></div>
-                  <span className={`badge ${l.priority==="high"?"badge-red":"badge-yellow"}`}>{l.priority}</span>
-                </div>
-                <div className="assigned-lead-action"><CheckSquare size={14} />{l.nextAction}<span style={{marginLeft:"auto",fontSize:12,color:"var(--gray-400)"}}>{l.dueDate}</span></div>
-              </div>
-            ))}
+        <div className="stat-card">
+          <div className="stat-label">Assigned Leads</div>
+          <div className="stat-value">{dashboardStats.assignedLeads}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Pending Tasks</div>
+          <div className="stat-value" style={{ color: "var(--orange)" }}>
+            {dashboardStats.pendingTasks}
           </div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">Today's Tours</div>
+          <div className="stat-value" style={{ color: "var(--blue)" }}>
+            {dashboardStats.upcomingVisits}
+          </div>
+        </div>
+      </div>
 
+      {/* ── Main Grid: Leads + Visits ──────────────────────── */}
+      <div className="grid-2 mb-5">
+        {/* ── My Assigned Leads ────────────────────────────── */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Upcoming Campus Visits</div>
-            <button className="btn btn-primary btn-sm" onClick={()=>navigate("/counseling/schedule-visit")}><Plus size={14}/> Schedule Visit</button>
+            <div className="card-title">My Assigned Leads</div>
           </div>
           <div className="card-body">
-            {visits.map(v => (
-              <div className="visit-card" key={v.id}>
-                <div className="visit-name">{v.student}</div>
-                <div className="visit-grade">{v.grade}</div>
-                <div className="visit-meta">
-                  <span><Calendar size={13}/> {v.date}</span>
-                  <span><Clock size={13}/> {v.time}</span>
+            {/* Search Bar */}
+            <div style={{ marginBottom: "16px" }}>
+              <input
+                type="text"
+                placeholder="Search leads by name or ID..."
+                value={searchQuery}
+                onChange={(e) => handleSearchLeads(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid var(--gray-200)",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  transition: "border-color 0.2s",
+                  outline: "none",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "var(--blue)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--gray-200)")}
+              />
+            </div>
+
+            {/* Leads List */}
+            {displayLeads.length > 0 ? (
+              displayLeads.map((lead) => (
+                <div className="assigned-lead-card" key={lead.id}>
+                  <div className="assigned-lead-top">
+                    <div>
+                      <div className="assigned-lead-name">{lead.name}</div>
+                      <div className="assigned-lead-grade">{lead.grade}</div>
+                    </div>
+                    <span
+                      className={`badge ${lead.priority === "high" ? "badge-red" : "badge-yellow"}`}
+                    >
+                      {lead.priority}
+                    </span>
+                  </div>
+                  <div className="assigned-lead-action">
+                    <CheckSquare size={14} />
+                    {lead.nextAction}
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: 12,
+                        color: "var(--gray-400)",
+                      }}
+                    >
+                      {lead.dueDate}
+                    </span>
+                  </div>
+                  {lead.phone && (
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--gray-400)",
+                        marginTop: "8px",
+                      }}
+                    >
+                      📞 {lead.phone}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))
+            ) : searchQuery ? (
+              <p
+                style={{
+                  color: "var(--gray-400)",
+                  textAlign: "center",
+                  padding: "30px 0",
+                  fontSize: "14px",
+                }}
+              >
+                No leads found matching "{searchQuery}"
+              </p>
+            ) : (
+              <p
+                style={{
+                  color: "var(--gray-400)",
+                  textAlign: "center",
+                  padding: "30px 0",
+                  fontSize: "14px",
+                }}
+              >
+                Search your assigned leads by name or ID
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Upcoming Campus Visits ────────────────────────── */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Today's Campus Visits</div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate("/counseling/schedule-visit")}
+              title="Schedule a new campus visit"
+            >
+              <Plus size={14} /> Schedule Visit
+            </button>
+          </div>
+          <div className="card-body">
+            {visits.length > 0 ? (
+              visits.map((visit) => (
+                <div className="visit-card" key={visit.id}>
+                  <div className="visit-name">{visit.student}</div>
+                  <div className="visit-grade">{visit.grade}</div>
+                  <div className="visit-meta">
+                    <span>
+                      <Calendar size={13} /> {visit.date}
+                    </span>
+                    <span>
+                      <Clock size={13} /> {visit.time}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--gray-400)",
+                      marginTop: "6px",
+                    }}
+                  >
+                    Status: {visit.status}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p
+                style={{
+                  color: "var(--gray-400)",
+                  textAlign: "center",
+                  padding: "30px 0",
+                  fontSize: "14px",
+                }}
+              >
+                No visits scheduled for today
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="card mb-4">
-        <div className="card-header"><div className="card-title">Follow-up Tasks</div></div>
-        <div className="card-body">
-          {tasks.map(t => (
-            <div className="task-row" key={t.id}>
-              <CheckSquare size={18} className={`task-check ${t.done?"done":""}`} />
-              <span className={`task-label ${t.done?"done":""}`}>{t.task}</span>
-              <span className={`badge ${t.priority==="high"?"badge-red":t.priority==="medium"?"badge-yellow":"badge-blue"}`}>{t.priority}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <button className="btn btn-blue" onClick={()=>navigate("/leads/add")}><Plus size={15}/> Add New Lead</button>
+      {/* ── Action Button ──────────────────────────────────── */}
+      <button
+        className="btn btn-blue"
+        onClick={() => navigate("/leads/add")}
+        title="Add a new lead to your portfolio"
+      >
+        <Plus size={15} /> Add New Lead
+      </button>
     </div>
   );
 }

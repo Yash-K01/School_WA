@@ -23,6 +23,8 @@ import templateRoutes from './routes/templateRoutes.js';
 import smsRoutes from './routes/sms.routes.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
 import campaignV2Routes from './routes/campaign.routes.js';
+// Add this import after campaignV2Routes 
+import counselingRoutes from './routes/counselingRoutes.js';
 
 dotenv.config();
 
@@ -129,6 +131,9 @@ app.use('/api/templates', templateRoutes);
 // SMS routes
 app.use('/api/sms', smsRoutes);
 
+// Counseling Workspace routes
+app.use('/api/counseling', counselingRoutes);
+
 // WhatsApp routes
 app.use('/api/whatsapp', whatsappRoutes);
 
@@ -140,6 +145,8 @@ app.use('/api', dashboardRoutes);
 
 // Funnel routes
 app.use('/api', funnelRoutes);
+
+
 
 // ============================================================================
 // ERROR HANDLING

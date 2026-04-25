@@ -744,76 +744,441 @@ Most current pages are self-contained and do not accept props. For future compon
 
 ---
 
-## Section 9.5 — Application Form Data Flow (Summary)
+## Section 9.5 — Application Form Data Flow (Detailed)
 
-1. User creates application (CreateApplication.jsx)
-2. API call → POST /api/applications
-3. Redirect to MultiStepApplication with application ID
-4. API call → GET /api/applications/:id/details
-5. Lead data received (if created from lead)
-6. useEffect maps lead → formData
-7. Form auto-fills automatically for human review
+**Step-by-Step Flow from User Action to Submission:**
 
----
+```
+1. User navigates to /applications
+   ↓
+   Applications.jsx mounts
+   ↓
+   useEffect runs → getApplicationCounts()
+   ↓
+   API call: GET /api/applications/counts
+   ↓
+   Backend returns: { draft: 5, submitted: 15, under_review: 3, ... }
+   ↓
+   Stats cards display with counts
+
+2. User clicks "New Application" button
+   ↓
+   Navigate to /applications/create
+   ↓
+   CreateApplication.jsx mounts
+   ↓
+   useLeads hook runs → fetches leads via GET /api/applications/eligible-leads
+   ↓
+   Lead list displays with search capability
+
+3. User selects a lead or chooses "Manual Entry"
+   ↓
+   If lead selected:
+     → handleSelectLead(lead) stores lead object
+   If manual entry:
+     → handleCreateWithoutLead() skips lead selection
+   ↓
+   Move to confirmation step
+
+4. User confirms academic year → handleCreateApplication()
+   ↓
+   API call: POST /api/applications (or POST /api/applications/new if manual)
+   Request: { lead_id: 456, academic_year_id: 2026 }
+   ↓
+   Backend creates application record
+   ↓
+   Backend returns: { id: 789, status: "draft", current_step: 1 }
+   ↓
+   Frontend stores activeAdmissionId in sessionStorage
+   ↓
+   Navigate to /applications/form/789 with lead data in location.state
+
+5. MultiStepApplication.jsx mounts
+   ↓
+   useApplication(789) hook initializes
+   ↓
+   useEffect runs three things in parallel:
+     a) getApplicationProgress(789)
+        API: GET /api/applications/789/progress
+        Returns: { steps: {...}, current_step: 1, overall_completion: 0 }
+
+     b) getApplicationDetails(789)
+        API: GET /api/applications/789/details
+        Returns: { student_info: {...}, parent_info: {...}, ... }
+
+     c) If lead data in location.state:
+        → Pre-fill form data from lead via useEffect mapping
+        → Maps lead { first_name, last_name, desired_class } to formData
+   ↓
+   Component renders Step 1 (Student Info) with pre-filled data if from lead
+
+6. User fills Student Information
+   ↓
+   User clicks "Next" → handleSaveStudentInfo(formData)
+   ↓
+   Validation runs (required: first_name, last_name, DOB)
+   ↓
+   API call: POST /api/applications/789/student-info
+   Request: { first_name: "...", last_name: "...", date_of_birth: "...", ... }
+   ↓
+   Backend saves to application_student_info table
+   ↓
+   Backend returns: { success: true, message: "..." }
+   ↓
+   Frontend updates progress state
+   ↓
+   Advance to Step 2 (Parent Info)
+
+7. User fills Parent Information
+   ↓
+   ParentForm component collects: father_name, mother_name, phones, emails
+   ↓
+   User clicks "Next" → handleSaveParentInfo(parentData)
+   ↓
+   API call: POST /api/applications/789/parent-info
+   Request: { father_name: "...", father_phone: "...", mother_name: "...", ... }
+   ↓
+   Backend saves to application_parent_info table
+   ↓
+   Advance to Step 3 (Academic Info)
+
+8. User fills Academic Information
+   ↓
+   User enters: current_school, current_class, percentage, subjects
+   ↓
+   User clicks "Next" → handleSaveAcademicInfo(academicData)
+   ↓
+   API call: POST /api/applications/789/academic-info
+   Request: { current_school: "...", current_class: "...", percentage: 85, subjects: [...] }
+   ↓
+   Backend saves to application_academic_info table
+   ↓
+   Advance to Step 4 (Photos)
+
+9. User uploads photos (Step 4)
+   ↓
+   User selects files: student_photo, student_aadhar, parent_photos
+   ↓
+   User clicks "Next" → handleSaveDocuments(formDataWithFiles)
+   ↓
+   Prepare multipart/form-data with files
+   ↓
+   API call: POST /api/applications/789/documents (multipart/form-data)
+   FormData: [file objects with metadata]
+   ↓
+   Backend uploads files to /backend/uploads/
+   ↓
+   Backend saves file references to database
+   ↓
+   Advance to Step 5 (Documents)
+
+10. User uploads documents (Step 5)
+    ↓
+    User selects: birth_certificate, transfer_certificate, previous_report, etc.
+    ↓
+    Same flow as Step 4:
+    ↓
+    API call: POST /api/applications/789/documents (more multipart)
+    ↓
+    Backend stores additional documents
+    ↓
+    Advance to Step 6 (Review & Submit)
+
+11. User reviews all information (Step 6)
+    ↓
+    Review component displays all saved data:
+    - Student info (name, DOB, etc.)
+    - Parent info (names, contacts)
+    - Academic info (school, class, marks)
+    - Uploaded documents with file links
+    ↓
+    User clicks "Submit Application"
+    ↓
+    handleSubmitApplication() runs
+    ↓
+    Final validation check
+    ↓
+    API call: POST /api/applications/789/submit
+    Request: {}
+    ↓
+    Backend changes status to "submitted"
+    ↓
+    Backend records submission timestamp
+    ↓
+    Backend returns: { success: true, data: { status: "submitted", submitted_at: "..." } }
+    ↓
+    Frontend displays success message
+    ↓
+    Navigate back to /applications with success toast
+    ↓
+    Applications list now shows the submitted application
+```
 
 ---
 
 ## Section 9.6 — Component Responsibility Table
 
-| Component | Responsibility | API Calls |
-|----------|---------------|-----------|
-| **CreateApplication.jsx** | Create new application (from lead or manual) | `POST /api/applications`, `GET /api/leads` |
-| **MultiStepApplication.jsx** | Handle form workflow + auto-fill from lead | `GET /api/applications/:id/details` |
-| **useApplication.js** | API communication & state management hook | `POST /api/applications/:id/[step]` |
-
----
+| Component                | File                       | Responsibility                                                            | API Calls                                                                                                                                                 |
+| ------------------------ | -------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Applications**         | `Applications.jsx`         | List all applications, show stats, manage draft tracking, search & filter | `GET /applications/counts`, `GET /applications/draft`, `GET /applications`                                                                                |
+| **CreateApplication**    | `CreateApplication.jsx`    | Lead selection, manual entry option, application creation                 | `GET /applications/eligible-leads`, `POST /applications`, `POST /applications/new`                                                                        |
+| **MultiStepApplication** | `MultiStepApplication.jsx` | Main form controller, step navigation, data collection across 6 steps     | `GET /applications/:id/progress`, `GET /applications/:id/details`, `POST /applications/:id/[student-info\|parent-info\|academic-info\|documents\|submit]` |
+| **ParentForm**           | `ParentForm.jsx`           | Collect parent details (father & mother), reusable across forms           | None (parent data passed via props)                                                                                                                       |
+| **StatsCard**            | `StatsCard.jsx`            | Display stat with label and value                                         | None (data passed via props)                                                                                                                              |
+| **ApplicationsTable**    | `ApplicationsTable.jsx`    | Render applications in table format with action buttons                   | None (data passed via props)                                                                                                                              |
+| **Layout**               | `Layout.jsx`               | App shell, header, navigation, logout                                     | None                                                                                                                                                      |
+| **useApplication**       | `hooks/useApplication.js`  | **Manage form state, progress tracking, save handlers for all 6 steps**   | All application endpoints (GET progress, GET details, POST student-info, etc.)                                                                            |
+| **useLeads**             | `hooks/useLeads.js`        | Fetch leads with search and filtering                                     | `GET /leads`                                                                                                                                              |
 
 **Key Insight:** `useApplication` hook is the brain of the multi-step form. It owns all API communication and state management for the application workflow.
 
 ---
 
-## Section 9.7 — Auto-Fill Logic (Frontend)
+## Section 9.7 — Auto-Fill Logic (Frontend Implementation)
 
-**Explicit Behavior:**
-- Auto-fill happens **ONLY** in the frontend.
-- It is triggered when an application is created from a lead.
-- Based on `lead_data` received from the API/context.
-- Implemented using a `useEffect` hook in `MultiStepApplication.jsx`.
+⚠️ **CRITICAL:** Auto-fill happens ONLY in the frontend. The backend does NOT auto-populate application fields from lead data.
 
-**Sample Mapping Code:**
+**How Auto-Fill Works:**
+
+1. **User creates application from lead** (in CreateApplication.jsx)
+   - Lead object selected and passed via `location.state`
+   - Application created via `POST /api/applications`
+
+2. **MultiStepApplication mounts** (MultiStepApplication.jsx)
+   - Receives `lead` object from `location.state`
+   - useApplication hook fetches application details (which is EMPTY on first form visit)
+   - useEffect detects both lead data AND empty application data
+
+3. **Mapping Logic** (in MultiStepApplication.jsx or useApplication hook)
+
+   ```javascript
+   // When both lead and application data exist:
+   if (locationState?.lead && !applicationDetails?.student_info?.first_name) {
+     // Auto-fill student info from lead
+     setFormData((prevFormData) => ({
+       ...prevFormData,
+       first_name: locationState.lead.first_name || "",
+       last_name: locationState.lead.last_name || "",
+       desired_class: locationState.lead.desired_class || "",
+       email: locationState.lead.email || "",
+       phone: locationState.lead.phone || "",
+     }));
+   }
+   ```
+
+4. **Form Data Structure** (Example for Step 1 - Student Info)
+
+   ```javascript
+   // Initial state (empty):
+   const [formData, setFormData] = useState({
+     first_name: "",
+     last_name: "",
+     middle_name: "",
+     date_of_birth: "",
+     gender: "",
+     blood_group: "",
+     aadhar_number: "",
+     phone: "",
+     email: "",
+     current_school: "",
+     current_class: "",
+   });
+
+   // After auto-fill from lead:
+   // {
+   //   first_name: 'John',           ← from lead.first_name
+   //   last_name: 'Doe',            ← from lead.last_name
+   //   middle_name: '',             ← empty (lead doesn't have this)
+   //   date_of_birth: '',           ← empty (lead doesn't have this)
+   //   gender: '',                  ← empty (lead doesn't have this)
+   //   ...
+   //   desired_class: 'Grade 5',    ← from lead.desired_class
+   //   email: 'john@example.com',   ← from lead.email
+   //   phone: '9876543210'          ← from lead.phone
+   // }
+   ```
+
+5. **User can now:**
+   - See pre-filled name, email, phone from lead
+   - Add missing information (DOB, gender, blood group, etc.)
+   - Submit the form with all required fields
+
+**Implementation Example:**
 
 ```javascript
+// In MultiStepApplication.jsx or useApplication hook
+
 useEffect(() => {
-  if (leadData && !formData.student_name) {
-    setFormData(prev => ({
-      ...prev,
-      student_name: `${leadData.first_name} ${leadData.last_name}`,
-      parent_name: leadData.parent_name || "",
-      parent_phone: leadData.phone || ""
+  // This runs when component mounts or lead data changes
+  if (locationState?.lead && currentStep === 1) {
+    // Auto-fill ONLY if we're on Step 1 AND we have lead data
+    const autoFillData = {
+      first_name: locationState.lead.first_name || "",
+      last_name: locationState.lead.last_name || "",
+      email: locationState.lead.email || "",
+      phone: locationState.lead.phone || "",
+      desired_class: locationState.lead.desired_class || "",
+      // Don't fill date_of_birth, gender, etc. - lead doesn't have these
+    };
+
+    setFormData((prevData) => ({
+      ...prevData,
+      ...autoFillData,
     }));
   }
-}, [leadData]);
+}, [locationState?.lead, currentStep]);
 ```
 
----
+**What Gets Auto-Filled:**
+
+- ✅ `first_name` from `lead.first_name`
+- ✅ `last_name` from `lead.last_name`
+- ✅ `email` from `lead.email`
+- ✅ `phone` from `lead.phone`
+- ✅ `desired_class` from `lead.desired_class`
+
+**What Does NOT Get Auto-Filled:**
+
+- ❌ `date_of_birth` (lead doesn't have this)
+- ❌ `gender` (lead doesn't have this)
+- ❌ `blood_group` (lead doesn't have this)
+- ❌ `aadhar_number` (lead doesn't have this)
+- ❌ `parent_info` (lead doesn't have parent details - separate fields)
+- ❌ `academic_info` (lead doesn't have academic history)
+
+**Manual Entry (No Lead):**
+
+- When creating application without lead, `location.state` won't have lead data
+- All form fields start empty
+- User fills all fields manually
+- No auto-fill logic runs
 
 ---
 
-## Section 9.8 — State Structure Example
+## Section 9.8 — Form State Structure Example
 
-Below is the standard `formData` structure used within the multi-step form:
+**Complete State Structure for Multi-Step Application:**
 
 ```javascript
-formData = {
-  student_name: "",
-  parent_name: "",
-  parent_phone: "",
-  current_class: "",
-  academic_year: ""
-}
-```
+// Step 1: Student Information
+const studentFormData = {
+  first_name: 'John',              // ← from lead if available
+  last_name: 'Doe',                // ← from lead if available
+  middle_name: 'Alexander',
+  date_of_birth: '2015-08-20',
+  gender: 'Male',
+  blood_group: 'O+',
+  aadhar_number: '123456789012',
+  phone: '9876543210',             // ← from lead if available
+  email: 'john@example.com',       // ← from lead if available
+  current_school: 'ABC School',
+  current_class: 'Grade 4'
+};
 
----
+// Step 2: Parent Information
+const parentFormData = {
+  father_name: 'Rajesh Kumar',
+  father_occupation: 'Engineer',
+  father_phone: '9876543200',
+  father_email: 'rajesh@example.com',
+  mother_name: 'Priya Kumar',
+  mother_occupation: 'Doctor',
+  mother_phone: '9876543201',
+  mother_email: 'priya@example.com',
+  address: '123, School Road, Delhi 110001'
+};
+
+// Step 3: Academic Information
+const academicFormData = {
+  current_school: 'ABC School',
+  current_class: 'Grade 4',
+  board: 'ICSE',
+  last_percentage: 85,
+  subjects: ['English', 'Mathematics', 'Science', 'Social Studies'],
+  previous_school: 'XYZ Playhouse'
+};
+
+// Step 4-5: Document Upload State
+const documentFormData = {
+  birth_certificate: null,         // File object or null
+  transfer_certificate: null,      // File object or null
+  previous_report_card: null,      // File object or null
+  address_proof: null,
+  parent_id_proof: null,
+  student_photo: null,
+  student_aadhar: null,
+  parent_photos: null,
+  parent_aadhar_cards: null
+};
+
+// Overall Application State (in useApplication hook)
+const applicationState = {
+  // Current step tracking
+  currentStep: 1,                  // 1-6
+  totalSteps: 6,
+
+  // Form data for current step
+  formData: {
+    // Dynamically contains studentFormData OR parentFormData OR academicFormData OR documentFormData
+  },
+
+  // Completion tracking
+  completedSteps: {
+    1: false,                      // Student Info completed?
+    2: false,                      // Parent Info completed?
+    3: false,                      // Academic Info completed?
+    4: false,                      // Photos completed?
+    5: false,                      // Documents completed?
+    6: false                       // Review completed?
+  },
+  overall_completion: 0,           // 0-100%
+
+  // File uploads
+  selectedFiles: {
+    birth_certificate: null,
+    student_photo: null,
+    // ... etc
+  },
+  uploadProgress: {},              // Track file upload progress
+
+  // API states
+  loading: false,                  // Global loading state
+  saving: false,                   // Saving current step
+  submitting: false,               // Final submission in progress
+  error: null,                     // Error message if any
+
+  // Progress data from API
+  progress: {
+    current_step: 1,
+    status: 'draft',
+    steps: {
+      1: { completed: false, fields: ['first_name', 'last_name', ...] },
+      2: { completed: false, fields: ['father_name', 'mother_name', ...] },
+      // ... etc
+    }
+  },
+
+  // Full application details from GET /applications/:id/details
+  details: {
+    application_id: 789,
+    status: 'draft',
+    student_info: {...},           // All fields saved so far
+    parent_info: {...},
+    academic_info: {...},
+    documents: [...]
+  },
+
+  // Lead data (if created from lead)
+  leadData: {
+    id: 456,
+    first_name: 'John',
+    last_name: 'Doe',
+    email: 'john@example.com',
+    phone: '9876543210',
+    desired_class: 'Grade 5'
+    // ... rest of lead fields
+  }
+};
 ```
 
 **How useApplication Hook Manages State:**
@@ -880,15 +1245,309 @@ const useApplication = (applicationId) => {
 
 ---
 
-## Section 10 — Common Issues & Solutions
+## Section 10 — Common issues & troubleshooting
 
-- **Missing lead_id**: Ensure `lead_id` is passed correctly in `POST /api/applications`.
-- **API response structure mismatch**: Verify that backend fields match the frontend `formData` keys.
-- **Field name mismatch**: Check for camelCase vs snake_case inconsistencies.
-- **Parent fields not mapped**: Ensure Step 2 logic handles parent detail extraction.
-- **State not updating**: Confirm that `setFormData` is called within the correct `useEffect` dependency array.
+- **API unreachable / CORS**
+  - Symptoms: `Failed to fetch` in browser console. Check backend URL, server running, CORS middleware, and proxy config in `vite.config.js`.
+- **Authentication issues**
+  - Symptoms: Protected routes redirect to `/login`. Verify `sessionStorage` contains token and `isAuthenticated()` returns true.
+- **Missing lead_id on application creation**
+  - Symptoms: `POST /api/applications` returns 400 "Missing required fields"
+  - Causes:
+    - Manual entry chosen but `lead_id` not explicitly set to `null`
+    - Frontend sends `lead_id: undefined` instead of `null`
+  - Solution: Explicitly set `lead_id: null` for manual entry mode
 
----
+  ```javascript
+  // WRONG:
+  POST /api/applications { academic_year_id: 2026 }  // lead_id missing
+
+  // RIGHT (for manual entry):
+  POST /api/applications/new { academic_year_id: 2026 }  // Use /new endpoint
+
+  // OR (if still using /api/applications):
+  POST /api/applications { lead_id: null, academic_year_id: 2026 }
+  ```
+
+- **API response structure mismatch**
+  - Symptoms: Form state shows as empty or undefined, even though API returns data
+  - Causes: Frontend expects different field names than backend returns
+  - Solution: Check API response in Network tab → compare to expected structure
+
+  ```javascript
+  // Backend returns:
+  { first_name: "John", last_name: "Doe", ... }
+
+  // Frontend expects same field names
+  // Map if different:
+  setFormData({
+    firstName: response.first_name,  // Remap if needed
+    lastName: response.last_name
+  });
+  ```
+
+- **Field name mismatch between frontend and backend**
+  - Symptoms: Form fields not pre-filling from application data
+  - Causes: Frontend uses camelCase (firstName) but API returns snake_case (first_name)
+  - Solution: Standardize on one format or add explicit mapping layer
+
+  ```javascript
+  // Create a mapper function:
+  const mapApiToForm = (apiData) => ({
+    first_name: apiData.first_name,
+    last_name: apiData.last_name,
+    // ... etc
+  });
+
+  // Use consistently:
+  setFormData(mapApiToForm(apiResponse));
+  ```
+
+- **Parent fields not getting mapped to form state**
+  - Symptoms: Parent info step shows empty fields even though parent data exists in application
+  - Causes:
+    - Step 2 extraction logic not properly pulling from application_parent_info
+    - Parent data not saved yet (first time filling parent info)
+  - Solution:
+    ```javascript
+    // In MultiStepApplication.jsx when loading Step 2:
+    if (applicationDetails?.parent_info) {
+      setFormData(applicationDetails.parent_info); // Direct mapping
+    } else {
+      setFormData(initialParentFormState); // Start empty
+    }
+    ```
+- **Form state not updating after API save**
+  - Symptoms: User fills form, clicks "Next", data saves to API but UI doesn't advance
+  - Causes:
+    - State update race condition
+    - Error not handled properly
+    - Loading state not reset
+  - Solution:
+    ```javascript
+    const handleSaveStudentInfo = async (data) => {
+      try {
+        setLoading(true);
+        await saveStudentInfo(applicationId, data);
+        // Explicitly update state AFTER successful save
+        setCompletedSteps((prev) => ({ ...prev, 1: true }));
+        setCurrentStep(2); // Advance step
+      } catch (err) {
+        setError(err.message); // Show error
+      } finally {
+        setLoading(false); // CRITICAL: Reset loading state
+      }
+    };
+    ```
+- **Multi-step form loses data**
+  - Symptoms: Data from previous steps disappears when navigating back to them
+  - Causes:
+    - `activeAdmissionId` not stored in sessionStorage
+    - Hook not fetching `getApplicationDetails()` properly
+    - Form state reset on component unmount
+  - Solution: Check browser's Storage tab for `activeAdmissionId` key
+  ```javascript
+  // Verify in browser DevTools:
+  // Application tab → Session Storage → activeAdmissionId = "789"
+  // If missing, add to sessionStorage when creating application:
+  sessionStorage.setItem("activeAdmissionId", applicationId);
+  ```
+- **File upload fails silently**
+  - Symptoms: Document/photo upload returns 413 or file size error, or no error shown to user
+  - Causes:
+    - Max file size exceeded (5MB per file)
+    - Invalid file format
+    - Multipart/form-data not formatted correctly
+    - Error not caught or displayed
+  - Solution:
+
+    ```javascript
+    // Check file size before upload:
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_FILE_SIZE) {
+      setError("File exceeds 5MB limit");
+      return;
+    }
+
+    // Check file type:
+    const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError("Invalid file format. Use PDF, JPG, or PNG");
+      return;
+    }
+
+    // Ensure error is displayed:
+    try {
+      await saveDocuments(applicationId, formData);
+    } catch (err) {
+      setError(err.message); // Display error to user
+    }
+    ```
+- **Application counts show incorrect numbers**
+  - Symptoms: Stats cards display wrong numbers (e.g., draft: 5 but only 2 drafts shown)
+  - Causes:
+    - Backend counting across all schools (not filtered by authenticated school)
+    - Status values inconsistent (draft vs DRAFT vs in_progress)
+    - Pagination not accounting for all records
+  - Solution: Verify backend filters by school_id and uses correct status names
+
+  ```javascript
+  // Check API response:
+  GET /api/applications/counts
+  Returns: { draft: 5, submitted: 15, under_review: 3, ... }
+
+  // If numbers wrong, check backend query includes:
+  // WHERE school_id = req.user.school_id
+  ```
+
+- **Draft applications don't appear**
+  - Symptoms: No draft applications shown even though user hasn't finished
+  - Causes:
+    - Backend not correctly filtering by status='draft'
+    - Draft status value incorrect (backend uses different value)
+    - User creating multiple applications and some are not in draft status
+  - Solution: Check backend returns correct status values
+
+  ```javascript
+  // Expected response:
+  GET /api/applications/draft
+  {
+    success: true,
+    data: [
+      { id: 789, student_name: "John Doe", status: "draft", created_at: "..." },
+      { id: 790, student_name: "Jane Smith", status: "draft", created_at: "..." }
+    ]
+  }
+
+  // If missing, verify backend query filters by status='draft' or 'in_progress'
+  ```
+
+- **Form validation issues (required fields block submission)**
+  - Symptoms: Cannot proceed to next step, validation errors shown
+  - Causes: Missing required fields or validation rules too strict
+  - Solution: Check validation rules for:
+    - Required fields: first_name, last_name, date_of_birth (step 1)
+    - Required fields: father_name, mother_name (step 2)
+    - Document validation: birth_certificate required (step 5)
+    - File size validation (max 5MB)
+    - Required photos (student_photo minimum)
+
+  ```javascript
+  // Check validation before save:
+  const validateStudentInfo = (formData) => {
+    const errors = [];
+    if (!formData.first_name?.trim()) errors.push("First name required");
+    if (!formData.last_name?.trim()) errors.push("Last name required");
+    if (!formData.date_of_birth) errors.push("Date of birth required");
+    return errors;
+  };
+
+  // Show errors before API call:
+  const handleSaveStudentInfo = (data) => {
+    const errors = validateStudentInfo(data);
+    if (errors.length > 0) {
+      setError(errors.join(", "));
+      return; // Don't make API call
+    }
+    // Proceed with save...
+  };
+  ```
+
+- **Search not working in applications**
+  - Symptoms: Search returns no results even though applications exist
+  - Causes:
+    - Query parameter format incorrect
+    - Backend search using exact match instead of fuzzy match
+    - Whitespace or special characters in search term
+  - Solution:
+
+    ```javascript
+    // Frontend sends:
+    GET /api/applications/search?q=john%20doe
+
+    // Backend should use ILIKE (PostgreSQL):
+    WHERE student_name ILIKE '%' || $1 || '%'  // Fuzzy match
+
+    // NOT exact match:
+    WHERE student_name = $1  // ❌ This won't work for partial searches
+    ```
+- **Auto-fill not working (lead name not pre-filling)**
+  - Symptoms: Form fields stay empty after creating application from lead
+  - Causes:
+    - Lead data not passed in `location.state` from CreateApplication
+    - useEffect not detecting lead data
+    - Condition checking for wrong prop/state variable
+    - Lead data shape different than expected
+  - Solution:
+
+    ```javascript
+    // Verify in MultiStepApplication.jsx:
+    const { state } = useLocation();
+    console.log("Lead data:", state?.lead); // Debug log
+
+    // Ensure CreateApplication passes lead:
+    navigate(`/applications/form/${app.id}`, {
+      state: { lead: selectedLead }, // ✅ Pass lead here
+    });
+
+    // Check useEffect dependency:
+    useEffect(() => {
+      if (state?.lead && currentStep === 1) {
+        // Do auto-fill
+      }
+    }, [state?.lead, currentStep]); // ✅ Include both dependencies
+    ```
+- **Auto-fill overwrites user changes**
+  - Symptoms: User manually edits a field, then it reverts to auto-filled value
+  - Causes:
+    - Auto-fill useEffect running too often
+    - useEffect not checking if field already has user input
+    - Unconditional state update overwriting user changes
+  - Solution:
+
+    ```javascript
+    // ❌ WRONG - runs every time form updates, overwrites changes:
+    useEffect(() => {
+      if (lead) {
+        setFormData((prev) => ({
+          ...prev,
+          first_name: lead.first_name, // Always overwrites!
+        }));
+      }
+    }, [lead, formData]); // Dependency cycle!
+
+    // ✅ RIGHT - runs only on mount or when lead changes:
+    useEffect(() => {
+      // Only auto-fill if field is currently empty
+      if (lead && !formData.first_name) {
+        setFormData((prev) => ({
+          ...prev,
+          first_name: lead.first_name,
+        }));
+      }
+    }, [lead]); // Only depend on lead, not formData
+    ```
+- **Multi-step form loses data**
+  - Symptoms: Data from previous steps disappears. Ensure `activeAdmissionId` is stored in sessionStorage and hook properly fetches `getApplicationDetails()`.
+  - Solution: Check browser's Storage tab for `activeAdmissionId` key.
+- **File upload fails**
+  - Symptoms: Document/photo upload returns 413 or file size error. Max file size is 5MB per file.
+  - Solution: Check file size, format (PDF, JPG, PNG), and ensure `application/:id/documents` endpoint accepts multipart/form-data.
+- **Application counts show incorrect numbers**
+  - Symptoms: Stats cards display wrong numbers. Ensure backend is counting correctly by status.
+  - Solution: Check backend `/api/applications/counts` endpoint response.
+- **Draft applications don't appear**
+  - Symptoms: No draft applications shown even though user hasn't finished. Ensure backend correctly returns drafts with `status: 'DRAFT'` or `status: 'in_progress'`.
+  - Solution: Verify backend query for draft applications.
+- **Form validation issues**
+  - Symptoms: Cannot proceed to next step. Check validation rules for:
+    - Required fields (first_name, last_name, date_of_birth, etc.)
+    - Document type validation
+    - File size validation (max 5MB)
+    - Required photos (student_photo minimum)
+- **Search not working**
+  - Symptoms: Search returns no results. Check query parameter format and backend search implementation.
+  - Solution: Verify backend `/api/applications/search` uses ILIKE or similar for fuzzy matching.
 
 ---
 
