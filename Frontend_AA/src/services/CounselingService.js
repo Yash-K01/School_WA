@@ -146,19 +146,21 @@ class CounselingService {
 
   /**
    * Create a new campus visit
-   * @param {Object} visitData - { lead_id, student_name, grade, visit_date, visit_time, notes (optional) }
+   * @param {Object} visitData - { lead_id (optional), visitor_name, visitor_phone, student_name, grade,
+   *                              number_of_visitors, visit_date, start_time, end_time, visit_type,
+   *                              assigned_to, areas_of_interest, special_requirements, internal_notes }
    * @returns {Promise<Object>} { success, data: CreatedVisit, message }
    */
   async createCampusVisit(visitData) {
     try {
-      const requiredFields = ['lead_id', 'student_name', 'grade', 'visit_date', 'visit_time'];
+      const requiredFields = ['visitor_name', 'visitor_phone', 'visit_date', 'start_time', 'end_time'];
       const missingFields = requiredFields.filter((field) => !(field in visitData));
 
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      const response = await this.authFetch(`${this.baseURL}/campus-visits`, {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits`, {
         method: 'POST',
         body: JSON.stringify(visitData),
       });
@@ -177,7 +179,7 @@ class CounselingService {
    */
   async getCampusVisit(visitId) {
     try {
-      const response = await this.authFetch(`${this.baseURL}/campus-visits/${visitId}`, {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/${visitId}`, {
         method: 'GET',
       });
       return await response.json();
@@ -188,14 +190,40 @@ class CounselingService {
   }
 
   /**
+   * Get time slot availability for a specific date
+   * @param {String} date - Date in YYYY-MM-DD format
+   * @returns {Promise<Object>} { success, data: Array<{ start_time, total_visits }> }
+   */
+  async getAvailableSlots(date) {
+    try {
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new Error('Invalid date format. Use YYYY-MM-DD');
+      }
+
+      const url = new URL(`${this.baseURL}/counseling/slots`);
+      url.searchParams.append('date', date);
+
+      const response = await this.authFetch(url.toString(), {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching available slots:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Update a campus visit
    * @param {Number} visitId - Visit ID
-   * @param {Object} updates - Fields to update { student_name, grade, visit_date, visit_time, status, notes }
+   * @param {Object} updates - Fields to update { visitor_name, visitor_phone, student_name, grade,
+   *                           number_of_visitors, visit_date, start_time, end_time, assigned_to,
+   *                           visit_type, status, internal_notes, tour_preferences }
    * @returns {Promise<Object>} { success, data: UpdatedVisit, message }
    */
   async updateCampusVisit(visitId, updates) {
     try {
-      const response = await this.authFetch(`${this.baseURL}/campus-visits/${visitId}`, {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/${visitId}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
       });
@@ -214,7 +242,7 @@ class CounselingService {
    */
   async deleteCampusVisit(visitId) {
     try {
-      const response = await this.authFetch(`${this.baseURL}/campus-visits/${visitId}`, {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/${visitId}`, {
         method: 'DELETE',
       });
 
