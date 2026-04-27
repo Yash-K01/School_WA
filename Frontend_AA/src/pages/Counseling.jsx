@@ -23,6 +23,7 @@ export function Counseling() {
   });
 
   const [visits, setVisits] = useState([]);
+  const [assignedLeads, setAssignedLeads] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -65,9 +66,10 @@ export function Counseling() {
         setError(null);
 
         // Fetch stats and today's visits in parallel
-        const [statsResponse, visitsResponse] = await Promise.all([
+        const [statsResponse, visitsResponse, leadsResponse] = await Promise.all([
           CounselingService.getDashboardStats(),
           CounselingService.getVisits(true), // filterToday = true
+          CounselingService.getAssignedLeads(),
         ]);
 
         // Handle stats response
@@ -89,16 +91,42 @@ export function Counseling() {
             id: visit.id,
             student:
               visit.student_name ||
+              visit.visitor_name ||
               `${visit.first_name || ""} ${visit.last_name || ""}`.trim(),
             grade: visit.grade || "N/A",
             date: formatDate(visit.visit_date),
-            time: formatTime(visit.visit_time),
+            time: formatTime(visit.start_time || visit.visit_time || ""),
             leadId: visit.lead_id,
             status: visit.status,
           }));
           setVisits(formattedVisits);
         } else {
           throw new Error(visitsResponse.message || "Failed to fetch visits");
+        }
+
+        if (leadsResponse.success) {
+          const formattedLeads = (leadsResponse.data || []).map((lead) => ({
+            id: lead.lead_id,
+            name: lead.student_name || "Unknown",
+            grade: lead.desired_class || "N/A",
+            priority: lead.follow_up_status === "hot" ? "high" : "medium",
+            nextAction: "Follow-up",
+            dueDate: lead.created_at
+              ? new Date(lead.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : "Today",
+            phone: lead.phone,
+            email: lead.email,
+            parentName: lead.parent_name,
+            parentPhone: lead.parent_phone,
+          }));
+          setAssignedLeads(formattedLeads);
+        } else {
+          throw new Error(
+            leadsResponse.message || "Failed to fetch assigned leads",
+          );
         }
 
         setLoading(false);
@@ -214,7 +242,7 @@ export function Counseling() {
   }, []);
 
   // Display leads from search results
-  const displayLeads = searchResults;
+  const displayLeads = searchQuery.trim() ? searchResults : assignedLeads;
 
   // ── Render: Loading State ──────────────────────────────────
   if (loading) {
@@ -392,7 +420,7 @@ export function Counseling() {
                   fontSize: "14px",
                 }}
               >
-                Search your assigned leads by name or ID
+                No assigned leads found yet
               </p>
             )}
           </div>

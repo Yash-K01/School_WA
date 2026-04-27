@@ -254,8 +254,10 @@ const transformFormToApiPayload = (formData) => {
     source: formData.leadSource || null,
     follow_up_status: 'pending',
     notes: buildNotesFromForm(formData),
-    assigned_to: formData.counselor || null, // This will be a name, needs mapping to user_id
-    academic_year_id: null, // Will be set from backend context or environment
+    // FIX: Map the name to the ID before sending to the API
+    assigned_to: formData.counselor ? mapCounselorNameToUserId(formData.counselor) : null,
+    
+    academic_year_id: null,
     follow_up_date: null,
     
   };
@@ -289,7 +291,7 @@ export const mapCounselorNameToUserId = (counselorName) => {
   // Hardcoded mapping for now - should be replaced with API call
   const counselorMap = {
     'Priya Sharma': 2,
-    'Amit Patel': 3,
+    'Amit_Patel': 3,
     'Neha Kumar': 4,
     'Rahul Singh': 5,
     'Anjali Gupta': 6,

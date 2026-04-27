@@ -341,6 +341,106 @@ export const deleteTemplate = async (templateId, schoolId) => {
   return result.rowCount > 0;
 };
 
+export const createScheduledEmail = async (payload) => {
+  const result = await pool.query(
+    `INSERT INTO scheduled_emails (
+      school_id,
+      sender_id,
+      recipient_type,
+      recipient_id,
+      recipients,
+      subject,
+      message,
+      attachments,
+      scheduled_at,
+      status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+    RETURNING *`,
+    [
+      payload.school_id,
+      payload.sender_id,
+      payload.recipient_type,
+      payload.recipient_id,
+      payload.recipients,
+      payload.subject,
+      payload.message,
+      JSON.stringify(payload.attachments || []),
+      payload.scheduled_at,
+      payload.status || 'pending',
+    ]
+  );
+
+  return result.rows[0];
+};
+
+export const getPendingScheduledEmails = async (limit = 50) => {
+  const result = await pool.query(
+    `SELECT id, school_id, sender_id, recipient_type, recipient_id, recipients, subject, message, attachments, scheduled_at
+     FROM scheduled_emails
+     WHERE scheduled_at <= NOW()
+       AND status = 'pending'
+     ORDER BY scheduled_at ASC
+     LIMIT $1`,
+    [limit]
+  );
+
+  return result.rows;
+};
+
+export const updateScheduledEmailStatus = async (id, status) => {
+  await pool.query(
+    `UPDATE scheduled_emails
+     SET status = $2
+     WHERE id = $1`,
+    [id, status]
+  );
+};
+
+export const createSimpleCommunicationLog = async (payload) => {
+  if (!payload?.school_id) {
+    throw new Error('school_id is required for communication log insertion.');
+  }
+
+  if (!payload?.sender_id) {
+    throw new Error('sender_id is required for communication log insertion.');
+  }
+
+  if (!payload?.recipient_id) {
+    throw new Error('recipient_id is required for communication log insertion.');
+  }
+
+  const result = await pool.query(
+    `INSERT INTO communication_log (
+      school_id,
+      created_by,
+      recipient_type,
+      recipient_id,
+      recipient_email,
+      channel,
+      subject,
+      message,
+      status,
+      attachments
+    )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+     RETURNING *`,
+    [
+      payload.school_id,
+      payload.sender_id,
+      payload.recipient_type,
+      payload.recipient_id,
+      payload.recipient_email,
+      'email',
+      payload.subject,
+      payload.message,
+      payload.status || 'sent',
+      JSON.stringify(payload.attachments || [])
+    ]
+  );
+
+  return result.rows[0];
+};
+
 export const createCampaign = async (schoolId, payload) => {
   const result = await pool.query(
     `INSERT INTO campaign (school_id, name, channel, status, start_date, end_date, created_at)

@@ -12,6 +12,16 @@ export const sendEmail = async (req, res, next) => {
   }
 };
 
+export const resolveApplicationRecipient = async (req, res, next) => {
+  try {
+    const data = await emailService.resolveApplicationRecipient(req.user.school_id, req.body);
+    return sendSuccess(res, data, 'Application recipient resolved successfully.');
+  } catch (error) {
+    logError('Resolve application recipient failed', { error: error.message, body: req.body });
+    return next(error);
+  }
+};
+
 export const getEmailLogs = async (req, res, next) => {
   try {
     const data = await emailService.getEmailLogs(req.user.school_id, req.query);

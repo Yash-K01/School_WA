@@ -2,6 +2,7 @@ import pool from '../config/db.js';
 import { sendEmail } from '../utils/emailSender.js';
 
 const VALID_RECIPIENT_TYPES = ['lead', 'student', 'parent'];
+const VALID_TARGET_AUDIENCES = ['lead_student', 'father', 'mother'];
 
 const getRecipientQuery = {
   lead: {
@@ -15,8 +16,143 @@ const getRecipientQuery = {
   },
 };
 
+const buildDisplayName = (firstName, lastName) =>
+  [firstName, lastName].filter(Boolean).join(' ').trim() || 'Unknown Recipient';
+
+export const resolveApplicationRecipient = async (schoolId, body) => {
+  const applicationId = Number.parseInt(body?.application_id, 10);
+  const targetAudience = String(body?.target_audience || '').trim().toLowerCase();
+
+  if (!applicationId) {
+    throw new Error('application_id is required');
+  }
+
+  if (!VALID_TARGET_AUDIENCES.includes(targetAudience)) {
+    throw new Error('target_audience must be one of: lead_student, father, mother');
+  }
+
+  const applicationResult = await pool.queryAsync(
+    `SELECT
+       a.id AS application_id,
+       a.school_id,
+       a.lead_id,
+       a.application_number,
+       l.first_name AS lead_first_name,
+       l.last_name AS lead_last_name,
+       l.email AS lead_email,
+       asi.first_name AS student_first_name,
+       asi.last_name AS student_last_name,
+       asi.email AS student_email,
+       api.father_name,
+       api.father_email,
+       api.mother_name,
+       api.mother_email
+     FROM application a
+     LEFT JOIN lead l ON l.id = a.lead_id AND l.school_id = a.school_id
+     LEFT JOIN application_student_info asi ON asi.application_id = a.id
+     LEFT JOIN application_parent_info api ON api.application_id = a.id
+     WHERE a.id = $1 AND a.school_id = $2
+     LIMIT 1`,
+    [applicationId, schoolId],
+  );
+
+  if (!applicationResult.rows.length) {
+    throw new Error('Application not found for this school');
+  }
+
+  const application = applicationResult.rows[0];
+
+  if (targetAudience === 'lead_student') {
+    if (application.lead_id) {
+      if (!application.lead_email) {
+        throw new Error(`Lead email is missing for application ${applicationId}`);
+      }
+
+      return {
+        application_id: applicationId,
+        recipient_type: 'lead',
+        recipient_id: Number(application.lead_id),
+        recipient_email: application.lead_email,
+        recipient_name: buildDisplayName(application.lead_first_name, application.lead_last_name),
+        target_audience: 'lead_student',
+        source: 'lead',
+        context_label: application.application_number || `Application #${applicationId}`,
+      };
+    }
+
+    if (!application.student_email) {
+      throw new Error(`Student email is missing for application ${applicationId}`);
+    }
+
+    return {
+      application_id: applicationId,
+      recipient_type: 'student',
+      recipient_id: Number(application.application_id),
+      recipient_email: application.student_email,
+      recipient_name: buildDisplayName(application.student_first_name, application.student_last_name),
+      target_audience: 'lead_student',
+      source: 'application_student_info',
+      context_label: application.application_number || `Application #${applicationId}`,
+    };
+  }
+
+  const relation = targetAudience === 'father' ? 'Father' : 'Mother';
+
+  const parentResult = await pool.queryAsync(
+    `SELECT
+       pd.id,
+       pd.first_name,
+       pd.last_name,
+       pd.email
+     FROM parent_detail pd
+     INNER JOIN admission ad ON ad.student_id = pd.student_id AND ad.application_id = $1 AND ad.school_id = $2
+     WHERE pd.school_id = $2
+       AND LOWER(pd.relation) = LOWER($3)
+     ORDER BY pd.updated_at DESC, pd.id DESC
+     LIMIT 1`,
+    [applicationId, schoolId, relation],
+  );
+
+  if (parentResult.rows.length) {
+    const parent = parentResult.rows[0];
+
+    if (!parent.email) {
+      throw new Error(`${relation} email is missing for application ${applicationId}`);
+    }
+
+    return {
+      application_id: applicationId,
+      recipient_type: 'parent',
+      recipient_id: Number(parent.id),
+      recipient_email: parent.email,
+      recipient_name: buildDisplayName(parent.first_name, parent.last_name),
+      target_audience,
+      source: 'parent_detail',
+      context_label: application.application_number || `Application #${applicationId}`,
+    };
+  }
+
+  const fallbackEmail = targetAudience === 'father' ? application.father_email : application.mother_email;
+  const fallbackName = targetAudience === 'father' ? application.father_name : application.mother_name;
+
+  if (!fallbackEmail) {
+    throw new Error(`${relation} email is missing for application ${applicationId}`);
+  }
+
+  return {
+    application_id: applicationId,
+    recipient_type: 'parent',
+    recipient_id: Number(applicationId),
+    recipient_email: fallbackEmail,
+    recipient_name: fallbackName || relation,
+    target_audience,
+    source: 'application_parent_info',
+    context_label: application.application_number || `Application #${applicationId}`,
+  };
+};
+
 export const sendEmailMessage = async (schoolId, userId, body) => {
-  const { recipient_type, recipient_id, subject, message, template_id } = body;
+  const { recipient_type, recipient_id, recipient_email, subject, message, template_id } = body;
 
   if (!recipient_type || !VALID_RECIPIENT_TYPES.includes(recipient_type)) {
     throw new Error('recipient_type must be one of: lead, student, parent');
@@ -53,17 +189,27 @@ export const sendEmailMessage = async (schoolId, userId, body) => {
     throw new Error('subject and message are required when template_id is not provided');
   }
 
-  const recipientQuery = getRecipientQuery[recipient_type];
-  const recipientResult = await pool.queryAsync(recipientQuery.text, [recipient_id, schoolId]);
+  let recipient = null;
 
-  if (!recipientResult.rows.length) {
-    throw new Error(`${recipient_type} recipient not found`);
-  }
+  if (recipient_email) {
+    recipient = {
+      email: recipient_email,
+      first_name: body.recipient_first_name || '',
+      last_name: body.recipient_last_name || '',
+    };
+  } else {
+    const recipientQuery = getRecipientQuery[recipient_type];
+    const recipientResult = await pool.queryAsync(recipientQuery.text, [recipient_id, schoolId]);
 
-  const recipient = recipientResult.rows[0];
+    if (!recipientResult.rows.length) {
+      throw new Error(`${recipient_type} recipient not found`);
+    }
 
-  if (!recipient.email) {
-    throw new Error(`Recipient email is missing for ${recipient_type} ${recipient_id}`);
+    recipient = recipientResult.rows[0];
+
+    if (!recipient.email) {
+      throw new Error(`Recipient email is missing for ${recipient_type} ${recipient_id}`);
+    }
   }
 
   sendEmail(recipient.email, finalSubject, finalMessage);

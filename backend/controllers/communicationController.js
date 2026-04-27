@@ -4,8 +4,18 @@ import { logError } from '../utils/logger.js';
 
 export const sendCommunication = async (req, res, next) => {
   try {
-    const data = await communicationService.sendCommunication(req.user.school_id, req.user.id, req.body);
-    return sendSuccess(res, data, 'Communication sent successfully.', 201);
+    const data = await communicationService.sendCommunication(
+      req.user?.school_id,
+      req.user?.id,
+      req.body,
+      req.files || [],
+    );
+
+    const successMessage = data?.scheduled
+      ? 'Email scheduled successfully'
+      : 'Email sent successfully';
+
+    return sendSuccess(res, data, successMessage, 201);
   } catch (error) {
     logError('Communication send failed', { error: error.message });
     return next(error);

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllSchools, getSchoolById, createSchool } from '../controllers/schoolController.js';
+import { getAllSchools, getSchoolById, createSchool, getSchoolCounselors } from '../controllers/schoolController.js';
 
 const router = express.Router();
 /**
@@ -12,6 +12,9 @@ router.get('/', getAllSchools);
 
 // GET school by ID
 router.get('/:id', getSchoolById);
+
+// GET school counselors by ID
+router.get('/:schoolId/counselors', getSchoolCounselors);
 
 // POST create new school
 router.post('/', createSchool);

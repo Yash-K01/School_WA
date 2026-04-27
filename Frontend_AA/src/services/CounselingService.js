@@ -10,8 +10,24 @@ const TOKEN_KEY = 'token';
 
 class CounselingService {
   constructor() {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
-    this.baseURL = `${API_BASE_URL}/api`;
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    this.baseURL = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
+  }
+
+  buildUrl(path, params = {}) {
+    const url = new URL(`${this.baseURL}${path}`, window.location.origin);
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.append(key, value);
+      }
+    });
+
+    return this.baseURL.startsWith('http')
+      ? url.toString().replace(window.location.origin, '').startsWith('/api')
+        ? `${this.baseURL}${path}${url.search}`
+        : url.toString()
+      : `${url.pathname}${url.search}`;
   }
 
   /**
@@ -105,12 +121,9 @@ class CounselingService {
    */
   async getVisits(filterToday = false) {
     try {
-      const url = new URL(`${this.baseURL}/counseling/visits`);
-      if (filterToday) {
-        url.searchParams.append('filterToday', 'true');
-      }
-
-      const response = await this.authFetch(url.toString(), {
+      const response = await this.authFetch(this.buildUrl('/counseling/visits', {
+        filterToday: filterToday ? 'true' : undefined,
+      }), {
         method: 'GET',
       });
       return await response.json();
@@ -127,14 +140,9 @@ class CounselingService {
    */
   async searchLeads(query) {
     try {
-      if (!query || query.trim() === '') {
-        return { success: true, data: [] };
-      }
-
-      const url = new URL(`${this.baseURL}/counseling/leads/search`);
-      url.searchParams.append('q', query);
-
-      const response = await this.authFetch(url.toString(), {
+      const response = await this.authFetch(this.buildUrl('/counseling/leads/search', {
+        q: query?.trim() || undefined,
+      }), {
         method: 'GET',
       });
       return await response.json();
@@ -142,6 +150,10 @@ class CounselingService {
       console.error('Error searching leads:', error.message);
       throw error;
     }
+  }
+
+  async getAssignedLeads() {
+    return this.searchLeads('');
   }
 
   /**
@@ -200,10 +212,9 @@ class CounselingService {
         throw new Error('Invalid date format. Use YYYY-MM-DD');
       }
 
-      const url = new URL(`${this.baseURL}/counseling/slots`);
-      url.searchParams.append('date', date);
-
-      const response = await this.authFetch(url.toString(), {
+      const response = await this.authFetch(this.buildUrl('/counseling/slots', {
+        date,
+      }), {
         method: 'GET',
       });
       return await response.json();

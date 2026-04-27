@@ -78,29 +78,41 @@ export const getVisits = async (req, res) => {
  */
 export const searchLeads = async (req, res) => {
   try {
-    const { school_id } = req.user;
-    const counselorId = req.user.id;
+    const school_id = req.user?.school_id;
+    const counselorId = req.user?.id;
     const { q } = req.query;
 
-    if (!q || q.trim() === '') {
-      return res.status(400).json({
+    if (!school_id || !counselorId) {
+      return res.status(401).json({
         success: false,
-        message: 'Search query (q) is required',
+        message: 'Unauthorized: Missing school or user context',
+        data: []
       });
     }
 
-    const leads = await counselingQueries.searchLeads(school_id, counselorId, q);
+    const normalizedQuery = String(q || '').trim();
+    const isNumericSearch = /^\d+$/.test(normalizedQuery);
+
+    if (normalizedQuery && !isNumericSearch && normalizedQuery.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query (q) must be at least 2 characters, or a numeric lead ID.',
+        data: []
+      });
+    }
+
+    const leads = await counselingQueries.searchLeads(school_id, counselorId, normalizedQuery);
 
     return res.json({
       success: true,
       data: leads || [],
     });
   } catch (error) {
-    console.error('Error in searchLeads:', error);
+    console.error('Error in searchLeads controller:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Failed to search leads',
-      error: error.message,
+      message: 'An unexpected error occurred while searching leads',
+      data: []
     });
   }
 };
@@ -191,7 +203,17 @@ export const createCampusVisit = async (req, res) => {
         `SELECT 
           id, first_name, last_name, email, phone, desired_class
          FROM lead 
-         WHERE id = $1 AND school_id = $2 AND assigned_to = $3`,
+         WHERE id = $1 AND school_id = $2
+           AND EXISTS (
+             SELECT 1
+             FROM app_user u
+             WHERE u.id = $3
+               AND u.school_id = $2
+               AND (
+                 lead.assigned_to = u.id::text
+                 OR LOWER(TRIM(COALESCE(lead.assigned_to, ''))) = LOWER(TRIM(COALESCE(u.name, '')))
+               )
+           )`,
         [lead_id, school_id, counselorId]
       );
 

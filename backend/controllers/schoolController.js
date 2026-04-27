@@ -118,8 +118,38 @@ const createSchool = async (req, res) => {
   }
 };
 
+// Get counselors by school ID
+const getSchoolCounselors = async (req, res) => {
+  const { schoolId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT id, name
+       FROM app_user
+       WHERE school_id = $1 AND role = 'counselor' AND status = 'active'
+       ORDER BY name ASC`,
+      [schoolId]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Counselors retrieved successfully',
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching counselors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching counselors',
+      error: error.message,
+    });
+  }
+};
+
 export {
   getAllSchools,
   getSchoolById,
   createSchool,
+  getSchoolCounselors,
 };

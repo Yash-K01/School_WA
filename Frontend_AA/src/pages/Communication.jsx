@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Plus, Mail, MessageSquare, Eye, BarChart2, X } from "lucide-react";
+import { fetchEmailLogs, fetchEmailStats } from "../services/emailService.js";
 import {
-  fetchEmailLogs,
-  fetchEmailRecipients,
-  fetchEmailStats,
-  sendEmailMessage,
-} from "../services/emailService.js";
-import {
+  fetchAllCommunicationRecipients,
   fetchCampaigns,
+  sendComposeEmail,
   fetchSmsLogs,
   fetchWhatsappLogs,
 } from "../services/communicationService.js";
@@ -69,12 +66,14 @@ export function Communication() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
 
   const [composeForm, setComposeForm] = useState({
-    recipient_type: "lead",
-    recipient_id: "",
     template_id: "",
     subject: "",
     message: "",
     recipient_search: "",
+    selectedRecipientKeys: [],
+    scheduleType: "now",
+    scheduledDate: "",
+    attachments: [],
   });
 
   const [templateForm, setTemplateForm] = useState({
@@ -84,13 +83,22 @@ export function Communication() {
     content: "",
   });
 
-  const selectedRecipient = useMemo(
+  const selectedRecipients = useMemo(
     () =>
-      emailRecipients.find(
-        (recipient) =>
-          String(recipient.id) === String(composeForm.recipient_id),
+      emailRecipients.filter((recipient) =>
+        composeForm.selectedRecipientKeys.includes(
+          `${recipient.recipient_type}:${recipient.id}`,
+        ),
       ),
-    [emailRecipients, composeForm.recipient_id],
+    [emailRecipients, composeForm.selectedRecipientKeys],
+  );
+
+  const selectedRecipientEmails = useMemo(
+    () =>
+      selectedRecipients
+        .map((recipient) => recipient.email)
+        .filter((email) => Boolean(email && String(email).trim())),
+    [selectedRecipients],
   );
 
   const formatDateTime = (value) => {
@@ -273,12 +281,12 @@ export function Communication() {
     }
   };
 
-  const loadRecipients = async (type, search = "") => {
+  const loadRecipients = async (search = "") => {
     setLoadingRecipients(true);
     setComposeError("");
 
     try {
-      const recipients = await fetchEmailRecipients(type, search);
+      const recipients = await fetchAllCommunicationRecipients(search);
       setEmailRecipients(recipients || []);
     } catch (error) {
       setComposeError(error.message || "Failed to load recipients.");
@@ -291,23 +299,23 @@ export function Communication() {
   const openComposeModal = async () => {
     setCompose(true);
     setComposeError("");
-    await loadRecipients(
-      composeForm.recipient_type,
-      composeForm.recipient_search,
-    );
+    await loadRecipients(composeForm.recipient_search);
   };
 
   const closeComposeModal = () => {
     setCompose(false);
     setComposeError("");
     setComposeForm({
-      recipient_type: "lead",
-      recipient_id: "",
       template_id: "",
       subject: "",
       message: "",
       recipient_search: "",
+      selectedRecipientKeys: [],
+      scheduleType: "now",
+      scheduledDate: "",
+      attachments: [],
     });
+    setEmailRecipients([]);
   };
 
   const handleTemplateChange = (templateId) => {
@@ -326,8 +334,10 @@ export function Communication() {
   const handleSendEmail = async () => {
     setComposeError("");
 
-    if (!composeForm.recipient_id) {
-      setComposeError("Please select a recipient.");
+    if (!selectedRecipientEmails.length) {
+      setComposeError(
+        "Please select at least one recipient with a valid email.",
+      );
       return;
     }
 
@@ -341,18 +351,35 @@ export function Communication() {
       return;
     }
 
+    if (composeForm.scheduleType === "later" && !composeForm.scheduledDate) {
+      setComposeError("Please select a date and time for scheduled email.");
+      return;
+    }
+
     setSendInProgress(true);
 
     try {
-      await sendEmailMessage({
-        recipient_type: composeForm.recipient_type,
-        recipient_id: Number.parseInt(composeForm.recipient_id, 10),
-        subject: composeForm.subject.trim(),
-        message: composeForm.message.trim(),
-        template_id: composeForm.template_id
-          ? Number.parseInt(composeForm.template_id, 10)
-          : undefined,
+      const formData = new FormData();
+      formData.append("recipients", selectedRecipientEmails.join(","));
+      formData.append("subject", composeForm.subject.trim());
+      formData.append("message", composeForm.message.trim());
+
+      // Pass recipient_id and recipient_type from the first selected recipient
+      // so the backend can store a proper reference in scheduled_emails / communication_logs
+      if (selectedRecipients.length > 0) {
+        formData.append("recipient_id", selectedRecipients[0].id);
+        formData.append("recipient_type", selectedRecipients[0].recipient_type);
+      }
+
+      if (composeForm.scheduleType === "later") {
+        formData.append("scheduledDate", composeForm.scheduledDate);
+      }
+
+      Array.from(composeForm.attachments || []).forEach((file) => {
+        formData.append("attachments", file);
       });
+
+      await sendComposeEmail(formData);
 
       closeComposeModal();
       await loadEmailData();
@@ -375,8 +402,8 @@ export function Communication() {
       return;
     }
 
-    loadRecipients(composeForm.recipient_type, composeForm.recipient_search);
-  }, [composeForm.recipient_type]);
+    loadRecipients(composeForm.recipient_search);
+  }, [compose]);
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
@@ -711,27 +738,7 @@ export function Communication() {
             </div>
             <div className="modal-body space-y-4">
               <div className="form-group">
-                <label className="form-label">
-                  Recipient Type <span className="req">*</span>
-                </label>
-                <select
-                  className="form-select"
-                  value={composeForm.recipient_type}
-                  onChange={(e) =>
-                    setComposeForm((prev) => ({
-                      ...prev,
-                      recipient_type: e.target.value,
-                      recipient_id: "",
-                    }))
-                  }
-                >
-                  <option value="lead">Lead</option>
-                  <option value="student">Student</option>
-                  <option value="parent">Parent</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Search Recipient</label>
+                <label className="form-label">Search Recipients</label>
                 <input
                   className="form-input"
                   value={composeForm.recipient_search}
@@ -747,38 +754,72 @@ export function Communication() {
                   className="btn btn-outline"
                   style={{ marginTop: 8 }}
                   type="button"
-                  onClick={() =>
-                    loadRecipients(
-                      composeForm.recipient_type,
-                      composeForm.recipient_search,
-                    )
-                  }
+                  onClick={() => loadRecipients(composeForm.recipient_search)}
                 >
                   {loadingRecipients ? "Searching..." : "Search"}
                 </button>
               </div>
               <div className="form-group">
                 <label className="form-label">
-                  Recipient <span className="req">*</span>
+                  Recipients <span className="req">*</span>
                 </label>
-                <select
-                  className="form-select"
-                  value={composeForm.recipient_id}
-                  onChange={(e) =>
-                    setComposeForm((prev) => ({
-                      ...prev,
-                      recipient_id: e.target.value,
-                    }))
-                  }
+                <div
+                  style={{
+                    border: "1px solid var(--gray-200)",
+                    borderRadius: 8,
+                    maxHeight: 200,
+                    overflowY: "auto",
+                    padding: 10,
+                    display: "grid",
+                    gap: 8,
+                  }}
                 >
-                  <option value="">Select recipient</option>
-                  {emailRecipients.map((recipient) => (
-                    <option key={recipient.id} value={recipient.id}>
-                      {recipient.name || `Recipient #${recipient.id}`}
-                    </option>
-                  ))}
-                </select>
-                {selectedRecipient?.email && (
+                  {emailRecipients.length === 0 && (
+                    <div style={{ fontSize: 13, color: "var(--gray-500)" }}>
+                      No recipients found.
+                    </div>
+                  )}
+                  {emailRecipients.map((recipient) => {
+                    const key = `${recipient.recipient_type}:${recipient.id}`;
+                    const isChecked =
+                      composeForm.selectedRecipientKeys.includes(key);
+
+                    return (
+                      <label
+                        key={key}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setComposeForm((prev) => ({
+                              ...prev,
+                              selectedRecipientKeys: checked
+                                ? [...prev.selectedRecipientKeys, key]
+                                : prev.selectedRecipientKeys.filter(
+                                    (value) => value !== key,
+                                  ),
+                            }));
+                          }}
+                        />
+                        <span style={{ fontSize: 13 }}>
+                          {(recipient.name || `Recipient #${recipient.id}`) +
+                            ` (${recipient.recipient_type})`}
+                          {recipient.email
+                            ? ` - ${recipient.email}`
+                            : " - No Email"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {!!selectedRecipientEmails.length && (
                   <div
                     style={{
                       marginTop: 6,
@@ -786,7 +827,7 @@ export function Communication() {
                       color: "var(--gray-500)",
                     }}
                   >
-                    Email: {selectedRecipient.email}
+                    {selectedRecipientEmails.length} recipient(s) selected
                   </div>
                 )}
               </div>
@@ -838,30 +879,84 @@ export function Communication() {
                   }
                 />
               </div>
+              <div className="form-group">
+                <label className="form-label">Attachments</label>
+                <input
+                  className="form-input"
+                  type="file"
+                  multiple
+                  onChange={(e) =>
+                    setComposeForm((prev) => ({
+                      ...prev,
+                      attachments: Array.from(e.target.files || []),
+                    }))
+                  }
+                />
+                {!!composeForm.attachments.length && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "var(--gray-500)",
+                    }}
+                  >
+                    {composeForm.attachments.length} file(s) selected
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Schedule</label>
+                <select
+                  className="form-select"
+                  value={composeForm.scheduleType}
+                  onChange={(e) =>
+                    setComposeForm((prev) => ({
+                      ...prev,
+                      scheduleType: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="now">Send Now</option>
+                  <option value="later">Schedule for Later</option>
+                </select>
+              </div>
+              {composeForm.scheduleType === "later" && (
+                <div className="form-group">
+                  <label className="form-label">
+                    Scheduled Date &amp; Time
+                  </label>
+                  <input
+                    className="form-input"
+                    type="datetime-local"
+                    value={composeForm.scheduledDate}
+                    onChange={(e) =>
+                      setComposeForm((prev) => ({
+                        ...prev,
+                        scheduledDate: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              )}
               {composeError && (
                 <div style={{ color: "var(--red)", fontSize: 13 }}>
                   {composeError}
                 </div>
               )}
-              <div className="flex gap-3">
-                <button className="btn btn-outline" style={{ fontSize: 13 }}>
-                  Attach Files
-                </button>
-                <button className="btn btn-outline" style={{ fontSize: 13 }}>
-                  Insert Variable
-                </button>
-              </div>
               <div className="flex justify-end gap-3">
                 <button className="btn btn-outline" onClick={closeComposeModal}>
                   Cancel
                 </button>
-                <button className="btn btn-outline">⬡ Schedule</button>
                 <button
                   className="btn btn-primary"
                   onClick={handleSendEmail}
                   disabled={sendInProgress}
                 >
-                  {sendInProgress ? "Sending..." : "✈ Send Now"}
+                  {sendInProgress
+                    ? "Sending..."
+                    : composeForm.scheduleType === "later"
+                      ? "Schedule Email"
+                      : "Send Now"}
                 </button>
               </div>
             </div>

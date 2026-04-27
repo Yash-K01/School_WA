@@ -1798,5 +1798,72 @@ INSERT INTO task (school_id, assigned_to, title, priority, is_done)
 VALUES (1, 5, 'Send weekly report', 'low', TRUE);
 
 -- ============================================================================
+-- TABLE: COMMUNICATION_LOGS & TEMPLATES
+-- ============================================================================
+-- TABLE: communication_logs
+-- Tracks every email/message sent for history and auditing
+CREATE TABLE communication_logs (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+  sender_id BIGINT NOT NULL, -- Links to the staff/user who sent it
+  
+  -- Recipient Details
+  recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('lead', 'student', 'parent')),
+  recipient_id BIGINT NOT NULL, 
+  recipient_email VARCHAR(255) NOT NULL,
+  
+  -- Content
+  subject VARCHAR(255),
+  content TEXT,
+  channel VARCHAR(10) DEFAULT 'email' CHECK (channel IN ('email', 'sms')),
+  
+  -- Status Tracking
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'delivered', 'opened', 'failed')),
+  error_message TEXT, -- Stores why a mail failed (e.g., "Invalid Email")
+  
+  -- Timestamps for Analytics
+  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  delivered_at TIMESTAMP,
+  opened_at TIMESTAMP,
+  clicked_at TIMESTAMP
+);
+
+-- Index for fast loading of communication history in the UI
+CREATE INDEX idx_comm_logs_school_recipient ON communication_logs(school_id, recipient_id, recipient_type);
+
+-- TABLE: communication_templates
+CREATE TABLE communication_templates (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL REFERENCES school(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL, -- e.g., 'Admission Inquiry Follow-up'
+  subject VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL, -- Stores HTML/Text with {{first_name}} placeholders
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ensure indexes exist for the resolveRecipient logic
+CREATE INDEX IF NOT EXISTS idx_parent_student_lookup ON parent_detail(student_id);
+
+-- ============================================================================
+-- TABLE: SCHEDULED_EMAILS
+-- ============================================================================
+-- Tracks emails scheduled for later delivery
+CREATE TABLE scheduled_emails (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  school_id BIGINT NOT NULL,
+  sender_id BIGINT NOT NULL,
+  recipient_type VARCHAR(20) NOT NULL, -- 'lead', 'student', or 'parent'
+  recipient_id BIGINT NOT NULL,
+  recipients TEXT NOT NULL, -- comma-separated list of recipient emails
+  subject VARCHAR(255),
+  message TEXT,
+  attachments JSONB DEFAULT '[]',
+  scheduled_at TIMESTAMP NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
 -- SQL Script ends
 -- ============================================================================

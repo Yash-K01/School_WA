@@ -1,6 +1,7 @@
 import pool from '../db/pool.js';
 import * as communicationQueries from '../db/queries/communicationQueries.js';
 import { dispatchCommunication } from '../utils/communicationProviders.js';
+import { sendMailWithGmail } from '../config/mailer.js';
 import AppError from '../utils/appError.js';
 import {
   assertPositiveInteger,
@@ -10,6 +11,44 @@ import {
   normalizeDateRangeFilters,
   parsePagination,
 } from '../utils/communicationValidation.js';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const parseRecipients = (rawRecipients) => {
+  const recipients = String(rawRecipients || '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  const uniqueRecipients = [...new Set(recipients)];
+
+  if (!uniqueRecipients.length) {
+    throw new AppError('recipients is required and must contain at least one email.', 400);
+  }
+
+  const invalidRecipients = uniqueRecipients.filter((email) => !EMAIL_REGEX.test(email));
+  if (invalidRecipients.length) {
+    throw new AppError(`Invalid recipient email(s): ${invalidRecipients.join(', ')}`, 400);
+  }
+
+  return uniqueRecipients;
+};
+
+const mapAttachmentMetadata = (files = []) =>
+  files.map((file) => ({
+    original_name: file.originalname,
+    file_name: file.filename,
+    file_path: file.path,
+    mime_type: file.mimetype,
+    size: file.size,
+  }));
+
+const mapNodemailerAttachments = (attachments = []) =>
+  attachments.map((attachment) => ({
+    filename: attachment.original_name || attachment.file_name,
+    path: attachment.file_path,
+    contentType: attachment.mime_type,
+  }));
 
 const buildTemplateVariables = (recipient) => ({
   recipient_name: recipient.name || '',
@@ -47,7 +86,39 @@ const resolveRecipient = async (schoolId, recipientType, recipientId) => {
   return recipient;
 };
 
-export const sendCommunication = async (schoolId, userId, payload) => {
+const normalizeScheduleType = (value) => String(value || '').trim().toLowerCase();
+
+const buildComposeLogPayload = ({ schoolId, userId, recipients, subject, message, attachments }) => ({
+  school_id: schoolId,
+  sender_id: userId,
+  recipient_type: 'email',
+  recipient_id: null,
+  recipient_email: recipients.join(','),
+  subject,
+  message,
+  attachments: attachments || [],
+  status: 'sent',
+});
+
+const resolveComposeRecipient = (payload) => {
+  if (!payload?.recipient_type) {
+    throw new AppError('recipient_type is required for compose email.', 400);
+  }
+
+  assertValidRecipientType(payload.recipient_type);
+
+  if (!payload?.recipient_id) {
+    throw new AppError('recipient_id is required for compose email.', 400);
+  }
+
+  const recipientId = assertPositiveInteger(payload.recipient_id, 'recipient_id');
+  return {
+    recipient_type: payload.recipient_type,
+    recipient_id: recipientId,
+  };
+};
+
+const sendCommunicationLegacy = async (schoolId, userId, payload) => {
   assertValidRecipientType(payload.recipient_type);
   assertValidChannel(payload.channel);
   const recipientId = assertPositiveInteger(payload.recipient_id, 'recipient_id');
@@ -106,6 +177,108 @@ export const sendCommunication = async (schoolId, userId, payload) => {
   } finally {
     client.release();
   }
+};
+
+export const sendCommunication = async (schoolId, userId, payload = {}, files = []) => {
+  if (!schoolId) {
+    throw new AppError('school_id is required to send communication.', 400);
+  }
+
+  if (!userId) {
+    throw new AppError('sender_id is required to send communication.', 400);
+  }
+
+  const composeEmailRequest =
+    typeof payload.recipients === 'string' ||
+    typeof payload.scheduleType === 'string' ||
+    typeof payload.scheduledDate === 'string';
+
+  if (!composeEmailRequest) {
+    return sendCommunicationLegacy(schoolId, userId, payload);
+  }
+
+  const recipients = parseRecipients(payload.recipients);
+  const subject = String(payload.subject || '').trim();
+  const message = String(payload.message || '').trim();
+  const attachmentMetadata = mapAttachmentMetadata(files);
+  const scheduleType = normalizeScheduleType(payload.scheduleType);
+  const composeRecipient = resolveComposeRecipient(payload);
+
+  if (!subject) {
+    throw new AppError('subject is required.', 400);
+  }
+
+  if (!message) {
+    throw new AppError('message is required.', 400);
+  }
+
+  const scheduledDate = payload.scheduledDate ? new Date(payload.scheduledDate) : null;
+  if (payload.scheduledDate && Number.isNaN(scheduledDate?.getTime())) {
+    throw new AppError('scheduledDate must be a valid date-time value.', 400);
+  }
+
+  const scheduleLater =
+    scheduleType === 'schedule for later' ||
+    scheduleType === 'later' ||
+    scheduleType === 'scheduled';
+
+  if (scheduleLater) {
+    if (!scheduledDate) {
+      throw new AppError('scheduledDate is required when scheduling an email.', 400);
+    }
+
+    const scheduledEmail = await communicationQueries.createScheduledEmail({
+      school_id: schoolId,
+      sender_id: userId,
+      recipient_type: composeRecipient.recipient_type,
+      recipient_id: composeRecipient.recipient_id,
+      recipients: recipients.join(','),
+      subject,
+      message,
+      attachments: attachmentMetadata,
+      scheduled_at: scheduledDate,
+      status: 'pending',
+    });
+
+    return {
+      scheduled: true,
+      id: scheduledEmail.id,
+      recipients: recipients.join(','),
+      subject,
+      scheduled_at: scheduledEmail.scheduled_at,
+    };
+  }
+
+  const transporterResponse = await sendMailWithGmail({
+    to: recipients.join(','),
+    subject,
+    text: message,
+    attachments: mapNodemailerAttachments(attachmentMetadata),
+  });
+
+  const emailLog = await communicationQueries.createSimpleCommunicationLog(
+    {
+      ...buildComposeLogPayload({
+        schoolId,
+        userId,
+        recipients,
+        subject,
+        message,
+        attachments: attachmentMetadata,
+      }),
+      recipient_type: composeRecipient.recipient_type,
+      recipient_id: composeRecipient.recipient_id,
+    },
+  );
+
+  return {
+    scheduled: false,
+    id: emailLog.id,
+    recipients: emailLog.recipient_email || emailLog.recipients,
+    subject: emailLog.subject,
+    sent_at: emailLog.sent_at,
+    provider_message_id: transporterResponse?.messageId || null,
+  };
 };
 
 export const getCommunicationLogs = async (schoolId, query) => {
@@ -181,3 +354,6 @@ export const getRecipients = async (schoolId, recipientType, search) => {
   assertValidRecipientType(recipientType);
   return communicationQueries.getRecipientsByType(recipientType, schoolId, search?.trim());
 };
+
+export const sendEmailCommunication = async (schoolId, userId, payload = {}, files = []) =>
+  sendCommunication(schoolId, userId, payload, files);

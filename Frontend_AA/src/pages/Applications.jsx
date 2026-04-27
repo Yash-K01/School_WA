@@ -1,7 +1,7 @@
 // ── Applications.jsx ────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Eye, Download } from "lucide-react";
+import { Plus, Search, Download } from "lucide-react";
 import {
   getApplications,
   searchApplications,
@@ -9,6 +9,8 @@ import {
   getDraftApplications,
   resumeDraftApplication,
 } from "../services/applicationService";
+import { ApplicationsTable } from "../components/ApplicationsTable";
+import { CommunicationModal } from "../components/CommunicationModal";
 import "../style.css";
 
 const statusMap = {
@@ -38,6 +40,8 @@ export function Applications() {
   const [filteredApps, setFilteredApps] = useState([]);
   const [draftApplications, setDraftApplications] = useState([]);
   const [showDrafts, setShowDrafts] = useState(false);
+  const [selectedApplicationIds, setSelectedApplicationIds] = useState([]);
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -46,6 +50,10 @@ export function Applications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchError, setSearchError] = useState(null);
+
+  const selectedApplications = filteredApps.filter((app) =>
+    selectedApplicationIds.map(String).includes(String(app.id)),
+  );
 
   // Fetch stats and admissions on mount
   useEffect(() => {
@@ -128,6 +136,14 @@ export function Applications() {
     } catch (err) {
       setError(err.message || "Unable to resume draft application");
     }
+  };
+
+  const handleBulkEmail = () => {
+    if (!selectedApplications.length) {
+      return;
+    }
+
+    setBulkEmailOpen(true);
   };
 
   // Format submitted date
@@ -357,74 +373,46 @@ export function Applications() {
       </div>
 
       {/* Applications Table */}
-      <div className="card">
-        {loading ? (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              color: "var(--gray-500)",
-            }}
-          >
-            <p>Loading applications...</p>
-          </div>
-        ) : filteredApps.length === 0 ? (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              color: "var(--gray-500)",
-            }}
-          >
-            <p>No applications found</p>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Application ID</th>
-                  <th>Student Name</th>
-                  <th>Grade</th>
-                  <th>Parent Contact</th>
-                  <th>Submitted Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredApps.map((app) => (
-                  <tr key={app.id}>
-                    <td className="td-bold">{app.id}</td>
-                    <td>{app.student_name || "—"}</td>
-                    <td>{app.grade || "—"}</td>
-                    <td>{app.parent_contact || "—"}</td>
-                    <td style={{ fontSize: 13 }}>
-                      {formatDate(app.submitted_at)}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${statusMap[app.status]?.cls || "badge-gray"}`}
-                      >
-                        {statusMap[app.status]?.label || app.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-ghost btn-icon"
-                        onClick={() => handleViewApplication(app.id)}
-                        title="View application"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <div
+          className="card"
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--gray-500)",
+          }}
+        >
+          <p>Loading applications...</p>
+        </div>
+      ) : filteredApps.length === 0 ? (
+        <div
+          className="card"
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--gray-500)",
+          }}
+        >
+          <p>No applications found</p>
+        </div>
+      ) : (
+        <ApplicationsTable
+          applications={filteredApps}
+          statusMap={statusMap}
+          onView={handleViewApplication}
+          selectedApplicationIds={selectedApplicationIds}
+          onSelectionChange={setSelectedApplicationIds}
+          onBulkEmail={handleBulkEmail}
+        />
+      )}
+
+      <CommunicationModal
+        open={bulkEmailOpen}
+        onClose={() => setBulkEmailOpen(false)}
+        selectedApplications={selectedApplications}
+        title="Bulk Email Selected Applications"
+        subtitle="Choose the audience, confirm the email preview, and send each message with live progress."
+      />
     </div>
   );
 }

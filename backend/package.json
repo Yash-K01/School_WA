@@ -36,6 +36,8 @@
     "knex": "^3.1.0",
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.13",
     "pg": "^8.20.0",
     "sequelize": "^6.35.0",
     "typeorm": "^0.3.17",

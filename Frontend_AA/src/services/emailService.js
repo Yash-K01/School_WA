@@ -67,6 +67,18 @@ export const fetchEmailRecipients = async (type, search = '') => {
   return response.data || [];
 };
 
+export const resolveApplicationRecipient = async (applicationId, targetAudience) => {
+  const response = await request('/resolve-recipient', {
+    method: 'POST',
+    body: JSON.stringify({
+      application_id: applicationId,
+      target_audience: targetAudience,
+    }),
+  });
+
+  return response.data;
+};
+
 export const sendEmailMessage = async (payload) => {
   const response = await request('/send', {
     method: 'POST',

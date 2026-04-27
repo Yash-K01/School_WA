@@ -6,6 +6,7 @@ import {
   getEmailStats,
   getRecipients,
   getTemplates,
+  resolveApplicationRecipient,
   sendEmail,
   updateEmailStatus,
   updateTemplate,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.post('/send', sendEmail);
+router.post('/resolve-recipient', resolveApplicationRecipient);
 router.get('/logs', getEmailLogs);
 router.get('/stats', getEmailStats);
 router.put('/:id/status', updateEmailStatus);
