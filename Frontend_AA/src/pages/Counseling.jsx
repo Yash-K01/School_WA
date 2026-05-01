@@ -178,8 +178,8 @@ export function Counseling() {
   const handleMarkVisited = async (visitId) => {
     try {
       await CounselingService.updateVisitStatus(visitId, "visited");
-      setUpcomingVisits((prev) => prev.filter((v) => v.id !== visitId));
-      setMissedVisits((prev) => prev.filter((v) => v.id !== visitId));
+      // Re-fetch data to reflect changes instantly on the UI
+      refreshVisits(false);
     } catch (err) {
       alert("Failed to update status");
     }
@@ -189,8 +189,8 @@ export function Counseling() {
     if (window.confirm("Are you sure you want to delete this visit?")) {
       try {
         await CounselingService.deleteCampusVisit(visitId);
-        setUpcomingVisits((prev) => prev.filter((v) => v.id !== visitId));
-        setMissedVisits((prev) => prev.filter((v) => v.id !== visitId));
+        // Re-fetch data to reflect changes instantly on the UI
+        refreshVisits(false);
       } catch (err) {
         alert("Failed to delete visit");
       }

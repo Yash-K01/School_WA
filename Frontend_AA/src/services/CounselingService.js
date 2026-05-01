@@ -288,6 +288,15 @@ class CounselingService {
     }
   }
 
+  // Aliases to meet requirements
+  async fetchFutureVisits() {
+    return this.getFutureVisits();
+  }
+
+  async fetchMissedVisits() {
+    return this.getMissedVisits();
+  }
+
   async updateVisitStatus(visitId, status) {
     try {
       const response = await this.authFetch(`${this.baseURL}/counseling/visits/${visitId}/status`, {
