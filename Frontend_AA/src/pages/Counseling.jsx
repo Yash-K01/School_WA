@@ -8,6 +8,9 @@ import {
   CheckSquare,
   AlertCircle,
   Loader,
+  CheckCircle,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import CounselingService from "../services/CounselingService.js";
 import "../style.css";
@@ -22,7 +25,9 @@ export function Counseling() {
     pendingTasks: 0,
   });
 
-  const [visits, setVisits] = useState([]);
+  const [upcomingVisits, setUpcomingVisits] = useState([]);
+  const [missedVisits, setMissedVisits] = useState([]);
+  const [editingVisit, setEditingVisit] = useState(null);
   const [assignedLeads, setAssignedLeads] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,6 +173,78 @@ export function Counseling() {
 
     fetchDashboardData();
   }, []);
+
+  // ── Action Handlers ────────────────────────────────────────
+  const handleMarkVisited = async (visitId) => {
+    try {
+      await CounselingService.updateVisitStatus(visitId, "visited");
+      setUpcomingVisits((prev) => prev.filter((v) => v.id !== visitId));
+      setMissedVisits((prev) => prev.filter((v) => v.id !== visitId));
+    } catch (err) {
+      alert("Failed to update status");
+    }
+  };
+
+  const handleDeleteVisit = async (visitId) => {
+    if (window.confirm("Are you sure you want to delete this visit?")) {
+      try {
+        await CounselingService.deleteCampusVisit(visitId);
+        setUpcomingVisits((prev) => prev.filter((v) => v.id !== visitId));
+        setMissedVisits((prev) => prev.filter((v) => v.id !== visitId));
+      } catch (err) {
+        alert("Failed to delete visit");
+      }
+    }
+  };
+
+  const renderVisitCard = (visit) => (
+    <div className="visit-card" key={visit.id}>
+      <div className="visit-name">{visit.student}</div>
+      <div className="visit-grade" style={{ fontSize: "13px", color: "var(--gray-500)", marginBottom: "4px" }}>
+        Visitor: {visit.visitor}
+      </div>
+      <div className="visit-meta">
+        <span>
+          <Calendar size={13} /> {visit.date}
+        </span>
+        <span>
+          <Clock size={13} /> {visit.time}
+        </span>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginTop: "12px",
+        }}
+      >
+        <button
+          className="btn btn-sm"
+          style={{ background: "#10b981", color: "white", padding: "6px 8px" }}
+          onClick={() => handleMarkVisited(visit.id)}
+          title="Mark as Visited"
+        >
+          <CheckCircle size={14} />
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{ background: "#3b82f6", color: "white", padding: "6px 8px" }}
+          onClick={() => setEditingVisit(visit)}
+          title="Reschedule"
+        >
+          <Edit size={14} />
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{ background: "#ef4444", color: "white", padding: "6px 8px" }}
+          onClick={() => handleDeleteVisit(visit.id)}
+          title="Delete"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
 
   // ── Debounced Search Function ──────────────────────────────
   const handleSearchLeads = useCallback((query) => {
@@ -478,6 +555,38 @@ export function Counseling() {
           </div>
         </div>
       </div>
+
+      {/* ── Edit Modal Placeholder ──────────────────────────── */}
+      {editingVisit && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "white",
+            padding: "24px",
+            borderRadius: "8px",
+            width: "400px",
+            maxWidth: "90%"
+          }}>
+            <h3 style={{ marginTop: 0 }}>Reschedule Visit</h3>
+            <p>Reschedule modal for {editingVisit.student}. Integration to edit page goes here.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setEditingVisit(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Action Button ──────────────────────────────────── */}
       <button

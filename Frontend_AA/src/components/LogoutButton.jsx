@@ -1,17 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import axios from "axios";
-import { clearToken } from "../utils/authToken.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import "../style.css";
 
 export function LogoutButton({ collapsed }) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     if (!window.confirm("Are you sure you want to logout?")) return;
 
     // State Cleanup: clear token, user_role, and school_id
-    clearToken();
+    logout();
     
     // Axios Integration: clear Authorization header globally so no further API calls can be made
     delete axios.defaults.headers.common['Authorization'];

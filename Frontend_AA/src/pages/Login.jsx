@@ -1,16 +1,39 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import "../style.css";
-import { setToken, setUserData } from "../utils/authToken.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, logout } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(location.pathname === "/admin-login");
+  const [showAdminAccess, setShowAdminAccess] = useState(location.pathname === "/admin-login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    const handleSecretShortcut = (event) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setShowAdminAccess(true);
+        setIsAdminLogin(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleSecretShortcut);
+    return () => window.removeEventListener("keydown", handleSecretShortcut);
+  }, []);
+
+  useEffect(() => {
+    if (location.pathname === "/admin-login") {
+      setShowAdminAccess(true);
+      setIsAdminLogin(true);
+    }
+  }, [location.pathname]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,26 +56,22 @@ export function Login() {
       const data = await response.json();
 
       if (data.success) {
+        const user = login(data.data.token, data.data.user);
+
+        if (isAdminLogin && user?.role !== "admin") {
+          logout();
+          setError("Permission Denied: Admin access required");
+          return;
+        }
+
         setSuccess("Login successful! Redirecting...");
         console.log(
           "✅ [LOGIN] Token received:",
           data.data.token?.substring(0, 20) + "...",
         );
-        setToken(data.data.token);
-        setUserData(data.data.user);
-
-        // Verify token was stored
-        const storedToken = localStorage.getItem("token");
-        console.log("✅ [LOGIN] Token stored in localStorage:", !!storedToken);
-        if (storedToken) {
-          console.log(
-            "✅ [LOGIN] Stored token preview:",
-            storedToken.substring(0, 20) + "...",
-          );
-        }
 
         setTimeout(() => {
-          navigate("/leads");
+          navigate(user?.role === "admin" ? "/admin" : "/dashboard", { replace: true });
         }, 1500);
       } else {
         setError(data.message || "Login failed");
@@ -92,20 +111,44 @@ export function Login() {
             color: "var(--gray-900)",
           }}
         >
-          Login
+          {isAdminLogin ? "Admin Portal Login" : "Login"}
         </h1>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <p style={{ fontSize: 14, color: "var(--gray-500)", margin: 0 }}>
-            Enter your credentials to access the system
+            {isAdminLogin ? "Enter admin credentials to access the portal" : "Enter your credentials to access the system"}
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: 13, color: isAdminLogin ? 'var(--gray-500)' : 'var(--primary)', fontWeight: isAdminLogin ? 'normal' : '500' }}>Staff</span>
-            <label className="toggle">
-              <input type="checkbox" checked={isAdminLogin} onChange={e => setIsAdminLogin(e.target.checked)} />
-              <span className="toggle-slider"></span>
-            </label>
-            <span style={{ fontSize: 13, color: isAdminLogin ? 'var(--primary)' : 'var(--gray-500)', fontWeight: isAdminLogin ? '500' : 'normal' }}>Admin</span>
-          </div>
+          {showAdminAccess && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--gray-200)', borderRadius: '9999px', padding: '4px', background: 'var(--gray-50)' }}>
+              <button
+                type="button"
+                onClick={() => setIsAdminLogin(false)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  background: !isAdminLogin ? 'white' : 'transparent',
+                  color: !isAdminLogin ? 'var(--primary-dark)' : 'var(--gray-500)',
+                  fontWeight: 600,
+                  boxShadow: !isAdminLogin ? 'var(--shadow-sm)' : 'none'
+                }}
+              >
+                Staff
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAdminLogin(true)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9999px',
+                  background: isAdminLogin ? 'white' : 'transparent',
+                  color: isAdminLogin ? 'var(--primary-dark)' : 'var(--gray-500)',
+                  fontWeight: 600,
+                  boxShadow: isAdminLogin ? 'var(--shadow-sm)' : 'none'
+                }}
+              >
+                Admin Portal
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (

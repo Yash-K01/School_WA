@@ -141,7 +141,7 @@ export function ScheduleVisit() {
     setLeadId(lead.lead_id);
     setForm((p) => ({
       ...p,
-      parentName: lead.parent_name || "",
+      parentName: lead.parent_name || lead.student_name || "",
       studentName: lead.student_name || "",
       email: lead.email || "",
       phone: lead.phone || "",

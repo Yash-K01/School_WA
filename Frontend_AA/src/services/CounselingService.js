@@ -263,6 +263,43 @@ class CounselingService {
       throw error;
     }
   }
+
+  async getFutureVisits() {
+    try {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/future`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching future visits:', error.message);
+      throw error;
+    }
+  }
+
+  async getMissedVisits() {
+    try {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/missed`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching missed visits:', error.message);
+      throw error;
+    }
+  }
+
+  async updateVisitStatus(visitId, status) {
+    try {
+      const response = await this.authFetch(`${this.baseURL}/counseling/visits/${visitId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating visit status:', error.message);
+      throw error;
+    }
+  }
 }
 
 export default new CounselingService();

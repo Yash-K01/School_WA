@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { Dashboard } from "./pages/Dashboard";
 import { Leads } from "./pages/Leads";
 import { AddLead } from "./pages/AddLead";
@@ -20,31 +21,20 @@ import { Security } from "./pages/Security";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { AdminPortal } from "./pages/AdminPortal";
-import { isAuthenticated, getUserData } from "./utils/authToken.js";
 
-// Protected route component - redirects to login if not authenticated
-function ProtectedRoute({ children }) {
-  return isAuthenticated() ? children : <Navigate to="/login" replace />;
-}
-
-// Admin protected route component - redirects to dashboard if not admin
-function AdminProtectedRoute({ children }) {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
-  const user = getUserData();
-  if (user && (user.role === 'admin' || user.role === 'super_admin')) {
-    return children;
-  }
-  return <Navigate to="/" replace />;
-}
+const adminRouteElement = (
+  <ProtectedRoute role="admin">
+    <AdminPortal />
+  </ProtectedRoute>
+);
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public route */}
         <Route path="/login" element={<Login />} />
+        <Route path="/admin-login" element={<Login />} />
 
-        {/* Protected routes */}
         <Route
           path="/"
           element={
@@ -53,7 +43,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="leads" element={<Leads />} />
           <Route path="leads/add" element={<AddLead />} />
           <Route path="pipeline" element={<Pipeline />} />
@@ -62,10 +53,7 @@ export default function App() {
           <Route path="counseling/schedule-visit" element={<ScheduleVisit />} />
           <Route path="applications" element={<Applications />} />
           <Route path="applications/create" element={<CreateApplication />} />
-          <Route
-            path="applications/form/:id"
-            element={<MultiStepApplication />}
-          />
+          <Route path="applications/form/:id" element={<MultiStepApplication />} />
           <Route path="application/:id" element={<MultiStepApplication />} />
           <Route path="applications/new" element={<NewApplication />} />
           <Route path="screening" element={<Screening />} />
@@ -75,12 +63,12 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="security" element={<Security />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="admin" element={
-            <AdminProtectedRoute>
-              <AdminPortal />
-            </AdminProtectedRoute>
-          } />
+          <Route path="admin" element={adminRouteElement} />
+          <Route path="admin/users" element={adminRouteElement} />
+          <Route path="admin/management" element={adminRouteElement} />
         </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

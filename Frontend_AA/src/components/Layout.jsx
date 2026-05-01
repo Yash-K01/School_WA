@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, TrendingUp, MessageSquare, UserCheck, FileText, ClipboardCheck, Award, CreditCard, GraduationCap, BarChart3, Shield, Settings as SettingsIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { LogoutButton } from "./LogoutButton";
+import { useAuth } from "../context/AuthContext.jsx";
 import schoolLogo from "../assets/school-logo.png";
 import sLogo from "../assets/sc-logo.png";
 import Full from "../assets/full.png";
 import "../style.css";
 
 const navItems = [
-  { path: "/",              label: "Dashboard",           icon: LayoutDashboard },
+  { path: "/dashboard",     label: "Dashboard",           icon: LayoutDashboard },
   { path: "/leads",         label: "Leads",               icon: Users },
   { path: "/pipeline",      label: "Pipeline",            icon: TrendingUp },
   { path: "/communication", label: "Communication",       icon: MessageSquare },
@@ -20,15 +21,17 @@ const navItems = [
   { path: "/enrollment",    label: "Enrollment",          icon: GraduationCap },
   { path: "/reports",       label: "Reports",             icon: BarChart3 },
   { path: "/security",      label: "Security & Compliance", icon: Shield },
-  { path: "/admin",         label: "Admin Portal",        icon: Shield },
+  { path: "/admin",         label: "Admin Dashboard",     icon: Shield },
   { path: "/settings",      label: "Settings",            icon: SettingsIcon },
 ];
 
 export function Layout() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
 
-  const isActive = (path) => path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const visibleNavItems = navItems.filter((item) => item.path !== "/admin" || user?.role === "admin");
 
   const toggleCollapse = () => {
     setCollapsed(!collapsed);
@@ -70,7 +73,7 @@ export function Layout() {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link 

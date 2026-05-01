@@ -5,6 +5,7 @@
  */
 
 import jwt from 'jsonwebtoken';
+import * as authQueries from '../db/queries/authQueries.js';
 
 /**
  * authMiddleware
@@ -64,13 +65,30 @@ export const authMiddleware = (req, res, next) => {
 };
 
 export const isAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ success: false, message: 'Not authenticated' });
-  }
-  if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
-    return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
-  }
-  next();
+  (async () => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+
+    const freshUser = await authQueries.getUserById(req.user.id);
+
+    if (!freshUser || freshUser.status !== 'active') {
+      return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
+    }
+
+    if (freshUser.role !== 'admin' && freshUser.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
+    }
+
+    req.user = {
+      ...req.user,
+      ...freshUser,
+    };
+
+    next();
+  })().catch((error) => {
+    next(error);
+  });
 };
 
 export default authMiddleware;
