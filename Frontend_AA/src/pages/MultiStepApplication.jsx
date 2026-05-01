@@ -1420,16 +1420,22 @@ export function MultiStepApplication() {
               { key: "parent_id_proof", label: "Parent ID Proof" },
             ].map((doc) => (
               <div className="form-group mb-4" key={doc.key}>
-                <label className="form-label">
-                  {doc.label}
-                </label>
-                <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 8 }}>
+                <label className="form-label">{doc.label}</label>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--gray-500)",
+                    marginBottom: 8,
+                  }}
+                >
                   (Optional - provide file, document number, or both)
                 </div>
-                
+
                 {/* File Upload Section */}
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div
+                    style={{ display: "flex", gap: 10, alignItems: "center" }}
+                  >
                     <input
                       id={`document_${doc.key}`}
                       type="file"

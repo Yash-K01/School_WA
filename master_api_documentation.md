@@ -1295,6 +1295,139 @@ Authorization: Bearer <token>
 
 ---
 
+### GET /api/counseling/visits/future
+
+**Purpose:** Get future scheduled visits
+
+**Does:**
+
+- Returns array of visit objects where visit_date >= CURRENT_DATE and status = 'scheduled'
+- Includes joined lead details
+
+**Request:**
+
+```
+GET /api/counseling/visits/future
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "lead_id": 456,
+      "visit_date": "2026-05-15",
+      "status": "scheduled"
+    }
+  ]
+}
+```
+
+---
+
+### GET /api/counseling/visits/missed
+
+**Purpose:** Get missed campus visits
+
+**Does:**
+
+- Returns array of visit objects where visit_date < CURRENT_DATE and status = 'scheduled'
+- Includes joined lead details
+
+**Request:**
+
+```
+GET /api/counseling/visits/missed
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 2,
+      "lead_id": 457,
+      "visit_date": "2026-04-10",
+      "status": "scheduled"
+    }
+  ]
+}
+```
+
+---
+
+### PATCH /api/counseling/visits/:id/status
+
+**Purpose:** Update a visit's status
+
+**Does:**
+
+- Updates status to 'visited' or 'cancelled'
+- Validates the new status
+
+**Request:**
+
+```json
+{
+  "status": "visited"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Visit status updated successfully",
+  "data": {
+    "id": 1,
+    "status": "visited"
+  }
+}
+```
+
+---
+
+### GET /api/counseling/leads/search
+
+**Purpose:** Search assigned leads by name or lead ID
+
+**Does:**
+
+- Uses ILIKE for case-insensitive matching on `visitor_name` and `student_name` (from joined `campus_visit` table), as well as lead fields.
+- Returns matching leads
+
+**Request:**
+
+```
+GET /api/counseling/leads/search?q=rajesh
+Authorization: Bearer <token>
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "lead_id": 456,
+      "student_name": "Rajesh Kumar",
+      "phone": "9876543210"
+    }
+  ]
+}
+```
+
+---
+
 ## Application Flow Diagrams
 
 ### Lead to Application Flow

@@ -167,7 +167,7 @@ export const searchLeads = async (schoolId, counselorId, query) => {
     const searchTerm = `%${queryStr}%`;
 
     let sql = `
-      SELECT 
+      SELECT DISTINCT
         l.id as lead_id,
         CONCAT(COALESCE(l.first_name, ''), ' ', COALESCE(l.last_name, ''))::varchar as student_name,
         l.phone,
@@ -178,6 +178,7 @@ export const searchLeads = async (schoolId, counselorId, query) => {
         l.follow_up_status,
         l.created_at
       FROM lead l
+      LEFT JOIN campus_visit cv ON cv.lead_id = l.id AND cv.school_id = l.school_id
       WHERE l.school_id = $1 AND ${assignedLeadMatchSql}
     `;
 
@@ -195,6 +196,8 @@ export const searchLeads = async (schoolId, counselorId, query) => {
         OR l.last_name ILIKE $3
         OR CONCAT(COALESCE(l.first_name, ''), ' ', COALESCE(l.last_name, '')) ILIKE $3
         OR l.phone ILIKE $3
+        OR cv.visitor_name ILIKE $3
+        OR cv.student_name ILIKE $3
       )`;
       params.push(searchTerm);
       console.log('searchLeads: Searching by name');
@@ -547,5 +550,120 @@ export const getTimeSlotAvailability = async (schoolId, date) => {
   } catch (error) {
     console.error('getTimeSlotAvailability Error:', error.message, error.stack);
     throw new Error(`Failed to fetch time slots: ${error.message}`);
+  }
+};
+
+/**
+ * getFutureVisits(schoolId, counselorId)
+ * Get future visits (visit_date >= CURRENT_DATE and status = 'scheduled')
+ * @param {Number} schoolId - School ID
+ * @param {Number} counselorId - Counselor user ID
+ * @returns {Promise<Array>} Array of upcoming visits
+ */
+export const getFutureVisits = async (schoolId, counselorId) => {
+  try {
+    if (!schoolId || !counselorId) return [];
+    
+    const sql = `
+      SELECT 
+        cv.id, cv.lead_id, cv.student_name, cv.visitor_name, cv.visitor_phone,
+        cv.visit_date, cv.start_time, cv.end_time, cv.status, cv.internal_notes,
+        cv.tour_preferences, cv.grade, cv.number_of_visitors, cv.visit_type,
+        l.first_name, l.last_name, l.phone, l.email, l.desired_class
+      FROM campus_visit cv
+      LEFT JOIN lead l ON cv.lead_id = l.id AND l.school_id = cv.school_id
+      WHERE cv.school_id = $1 AND cv.assigned_to = $2
+        AND cv.visit_date >= CURRENT_DATE AND cv.status = 'scheduled'
+      ORDER BY cv.visit_date ASC, cv.start_time ASC
+    `;
+
+    console.log('Executing query (future visits):', sql, [schoolId, counselorId]);
+    const result = await pool.query(sql, [schoolId, counselorId]);
+
+    return result.rows || [];
+  } catch (error) {
+    console.error('getFutureVisits Error:', error.message, error.stack);
+    throw new Error(`Failed to fetch future visits: ${error.message}`);
+  }
+};
+
+/**
+ * getMissedVisits(schoolId, counselorId)
+ * Get missed visits (visit_date < CURRENT_DATE and status = 'scheduled')
+ * @param {Number} schoolId - School ID
+ * @param {Number} counselorId - Counselor user ID
+ * @returns {Promise<Array>} Array of missed visits
+ */
+export const getMissedVisits = async (schoolId, counselorId) => {
+  try {
+    if (!schoolId || !counselorId) return [];
+    
+    const sql = `
+      SELECT 
+        cv.id, cv.lead_id, cv.student_name, cv.visitor_name, cv.visitor_phone,
+        cv.visit_date, cv.start_time, cv.end_time, cv.status, cv.internal_notes,
+        cv.tour_preferences, cv.grade, cv.number_of_visitors, cv.visit_type,
+        l.first_name, l.last_name, l.phone, l.email, l.desired_class
+      FROM campus_visit cv
+      LEFT JOIN lead l ON cv.lead_id = l.id AND l.school_id = cv.school_id
+      WHERE cv.school_id = $1 AND cv.assigned_to = $2
+        AND cv.visit_date < CURRENT_DATE AND cv.status = 'scheduled'
+      ORDER BY cv.visit_date DESC, cv.start_time DESC
+    `;
+
+    console.log('Executing query (missed visits):', sql, [schoolId, counselorId]);
+    const result = await pool.query(sql, [schoolId, counselorId]);
+
+    return result.rows || [];
+  } catch (error) {
+    console.error('getMissedVisits Error:', error.message, error.stack);
+    throw new Error(`Failed to fetch missed visits: ${error.message}`);
+  }
+};
+
+/**
+ * updateVisitStatus(id, schoolId, counselorId, status)
+ * Update a campus visit's status to 'visited' or 'cancelled'
+ * @param {Number} id - Visit ID
+ * @param {Number} schoolId - School ID
+ * @param {Number} counselorId - Counselor user ID
+ * @param {String} status - The new status
+ * @returns {Promise<Object>} Updated visit record
+ */
+export const updateVisitStatus = async (id, schoolId, counselorId, status) => {
+  try {
+    if (!id || !schoolId || !counselorId || !status) {
+      const error = new Error('Missing required parameters for status update');
+      error.code = 'MISSING_PARAMS';
+      throw error;
+    }
+
+    if (!['visited', 'cancelled'].includes(status)) {
+      const error = new Error('Invalid status. Must be "visited" or "cancelled"');
+      error.code = 'INVALID_STATUS';
+      throw error;
+    }
+
+    const sql = `
+      UPDATE campus_visit
+      SET status = $4, updated_at = NOW()
+      WHERE id = $1 AND school_id = $2 AND assigned_to = $3
+      RETURNING *
+    `;
+
+    console.log('Executing query (update visit status):', sql, [id, schoolId, counselorId, status]);
+    const result = await pool.query(sql, [id, schoolId, counselorId, status]);
+
+    if (!result || !result.rows || result.rows.length === 0) {
+      const error = new Error('Visit not found or not authorized to update');
+      error.code = 'UPDATE_FAILED';
+      throw error;
+    }
+
+    console.log('updateVisitStatus: Successfully updated visit status for ID', id);
+    return result.rows[0];
+  } catch (error) {
+    console.error('updateVisitStatus Error:', error.message, error.stack);
+    throw error;
   }
 };

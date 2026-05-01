@@ -7,7 +7,7 @@ import {
   saveAcademicInfo,
   saveDocuments,
   submitApplication,
-  deleteApplication as deleteApplicationApi
+  deleteApplication
 } from '../services/applicationService.js';
 
 /**
@@ -182,12 +182,12 @@ export function useApplication(applicationId) {
   };
 
   // Delete application (only allowed for draft status)
-  const deleteApplication = async () => {
+  const handleDeleteApplication = async () => {
     try {
       setError(null);
       setLoading(true);
 
-      await deleteApplicationApi(effectiveApplicationId);
+      await deleteApplication(effectiveApplicationId);
 
       console.log('✅ Application deleted successfully');
       return true;
@@ -213,6 +213,6 @@ export function useApplication(applicationId) {
     handleSaveAcademicInfo,
     handleSaveDocuments,
     handleSubmitApplication,
-    deleteApplication
+    handleDeleteApplication
   };
 }

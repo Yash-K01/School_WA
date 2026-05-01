@@ -20,8 +20,11 @@ router.get('/stats', counselingController.getDashboardStats);
 // Campus visit management
 router.get('/visits', counselingController.getVisits);
 router.post('/visits', counselingController.createCampusVisit);
+router.get('/visits/future', counselingController.getFutureVisits);
+router.get('/visits/missed', counselingController.getMissedVisits);
 router.get('/visits/:id', counselingController.getCampusVisit);
 router.put('/visits/:id', counselingController.updateCampusVisit);
+router.patch('/visits/:id/status', counselingController.updateVisitStatus);
 router.delete('/visits/:id', counselingController.deleteCampusVisit);
 
 // Time slot availability

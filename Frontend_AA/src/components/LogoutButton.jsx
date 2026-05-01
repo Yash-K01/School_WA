@@ -8,6 +8,8 @@ export function LogoutButton({ collapsed }) {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    if (!window.confirm("Are you sure you want to logout?")) return;
+
     // State Cleanup: clear token, user_role, and school_id
     clearToken();
     
@@ -27,13 +29,12 @@ export function LogoutButton({ collapsed }) {
         background: "transparent", 
         border: "none", 
         textAlign: "left",
-        cursor: "pointer",
-        color: "#ef4444", // Redish tint for logout to differentiate from standard nav items, while fitting the white/clean theme
+        cursor: "pointer"
       }}
       title={collapsed ? "Logout" : undefined}
     >
-      <LogOut className="nav-icon" size={20} style={{ color: "#ef4444" }} />
-      {!collapsed && <span className="nav-label" style={{ color: "#ef4444" }}>Logout</span>}
+      <LogOut className="nav-icon" size={20} />
+      {!collapsed && <span className="nav-label">Logout</span>}
     </button>
   );
 }

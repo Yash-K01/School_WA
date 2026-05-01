@@ -500,3 +500,59 @@ export const getTimeSlotAvailability = async (req, res) => {
     });
   }
 };
+
+/**
+ * GET /api/counseling/visits/future
+ * Get future visits (visit_date >= CURRENT_DATE and status = 'scheduled')
+ */
+export const getFutureVisits = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const counselorId = req.user.id;
+    const visits = await counselingQueries.getFutureVisits(school_id, counselorId);
+    return res.json({ success: true, data: visits });
+  } catch (error) {
+    console.error('Error in getFutureVisits:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch future visits', error: error.message });
+  }
+};
+
+/**
+ * GET /api/counseling/visits/missed
+ * Get missed visits (visit_date < CURRENT_DATE and status = 'scheduled')
+ */
+export const getMissedVisits = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const counselorId = req.user.id;
+    const visits = await counselingQueries.getMissedVisits(school_id, counselorId);
+    return res.json({ success: true, data: visits });
+  } catch (error) {
+    console.error('Error in getMissedVisits:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch missed visits', error: error.message });
+  }
+};
+
+/**
+ * PATCH /api/counseling/visits/:id/status
+ * Update a visit's status to 'visited' or 'cancelled'
+ * Body: { status: 'visited' | 'cancelled' }
+ */
+export const updateVisitStatus = async (req, res) => {
+  try {
+    const { school_id } = req.user;
+    const counselorId = req.user.id;
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!['visited', 'cancelled'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status. Must be "visited" or "cancelled"' });
+    }
+
+    const updatedVisit = await counselingQueries.updateVisitStatus(id, school_id, counselorId, status);
+    return res.json({ success: true, message: 'Visit status updated successfully', data: updatedVisit });
+  } catch (error) {
+    console.error('Error in updateVisitStatus:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update visit status', error: error.message });
+  }
+};

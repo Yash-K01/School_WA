@@ -332,7 +332,7 @@ export async function submitApplication(applicationId) {
 }
 
 export async function deleteApplication(applicationId) {
-  return request(`${BASE_URL}/${applicationId}`, {
+  return fetchWithAuth(`/api/applications/${applicationId}`, {
     method: 'DELETE',
   });
 }

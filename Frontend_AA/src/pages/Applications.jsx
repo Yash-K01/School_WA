@@ -140,21 +140,25 @@ export function Applications() {
   };
 
   const handleDeleteDraft = async (appId) => {
-    if (!window.confirm("Are you sure you want to delete this draft application? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this draft application? This action cannot be undone.",
+      )
+    ) {
       return;
     }
 
     try {
       const response = await fetch(`/api/applications/${appId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete application');
+        throw new Error(errorData.message || "Failed to delete application");
       }
 
       // Refresh draft applications list
@@ -165,10 +169,10 @@ export function Applications() {
       const updatedCounts = await getApplicationCounts();
       setStats(updatedCounts);
 
-      console.log('✅ Draft application deleted successfully');
+      console.log("✅ Draft application deleted successfully");
     } catch (err) {
       setError(err.message || "Unable to delete draft application");
-      console.error('Error deleting draft:', err);
+      console.error("Error deleting draft:", err);
     }
   };
 
@@ -288,11 +292,15 @@ export function Applications() {
                         >
                           Resume
                         </button>
-                        {['draft', 'in_progress'].includes(draft.status) && (
+                        {["draft", "in_progress"].includes(draft.status) && (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() => handleDeleteDraft(draft.id)}
-                            style={{ backgroundColor: "#dc2626", borderColor: "#dc2626", color: "white" }}
+                            style={{
+                              backgroundColor: "#dc2626",
+                              borderColor: "#dc2626",
+                              color: "white",
+                            }}
                           >
                             Delete
                           </button>

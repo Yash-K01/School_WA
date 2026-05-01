@@ -64,12 +64,12 @@ export default function ParentForm({
     // NOTE: Lead data contains student information, not parent information
     // Parent fields should be left empty for manual entry unless parent data is explicitly provided
     // Only use lead contact information (phone, email) if available
-    const leadPhone = lead.father_phone || lead.lead_phone || lead.phone || "";
-    const leadEmail = lead.father_email || lead.lead_email || lead.email || "";
+    const leadPhone = lead.lead_phone || lead.phone || "";
+    const leadEmail = lead.lead_email || lead.email || "";
 
     setForm((f) => ({
       ...f,
-      fatherName: lead.father_name || lead.fatherName || f.fatherName,
+      // Leave parent names empty for manual entry - lead contains student data, not parent data
       fatherPhone: leadPhone || f.fatherPhone,
       fatherEmail: leadEmail || f.fatherEmail,
     }));
