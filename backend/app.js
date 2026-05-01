@@ -25,6 +25,7 @@ import whatsappRoutes from './routes/whatsapp.routes.js';
 import campaignV2Routes from './routes/campaign.routes.js';
 import counselingRoutes from './routes/counselingRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
@@ -145,6 +146,9 @@ app.use('/api', dashboardRoutes);
 
 // User Management routes
 app.use('/api/users', userRoutes);
+
+// Admin routes
+app.use('/api/admin', adminRoutes);
 
 // Funnel routes
 app.use('/api', funnelRoutes);

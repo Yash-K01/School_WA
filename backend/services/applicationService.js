@@ -1662,11 +1662,9 @@ export const deleteApplication = async (schoolId, applicationId) => {
 
     // Delete the application itself
     const deleteQuery = `
-      DELETE FROM application 
-      WHERE id = $1 AND school_id = $2 
-      AND status IN ('draft', 'in_progress') 
-      RETURNING id`, 
-      [applicationId, schoolId]
+      DELETE FROM application
+      WHERE id = $1 AND school_id = $2 AND status = 'draft'
+      RETURNING id, school_id, status
     `;
 
     const deleteResult = await client.query(deleteQuery, [applicationId, schoolId]);
