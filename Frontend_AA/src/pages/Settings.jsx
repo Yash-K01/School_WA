@@ -22,7 +22,7 @@ export function Settings() {
       </div>
 
       <div className="tabs">
-        {["general","notifications","email","appearance"].map(t=>(
+        {["general","notifications","email","appearance", "security"].map(t=>(
           <button key={t} className={`tab-btn ${tab===t?"active":""}`} onClick={()=>setTab(t)}>
             {t.charAt(0).toUpperCase()+t.slice(1)}
           </button>
@@ -115,6 +115,34 @@ export function Settings() {
               <div><div className="settings-toggle-title">Dark Mode</div><div className="settings-toggle-sub">Switch to dark theme</div></div>
               <label className="toggle"><input type="checkbox" checked={darkMode} onChange={e=>setDarkMode(e.target.checked)}/><span className="toggle-slider"/></label>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab==="security" && (
+        <div className="card">
+          <div className="card-header"><div className="card-title">Security Settings</div></div>
+          <div className="card-body">
+            <h3 style={{ fontSize: "16px", fontWeight: 500, marginBottom: "16px", color: "var(--gray-800)" }}>Change Password</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const oldPass = e.target.oldPass.value;
+              const newPass = e.target.newPass.value;
+              // Add real logic or API call here.
+              // For demonstration:
+              alert("Password changed successfully (Demo)");
+              e.target.reset();
+            }}>
+              <div className="form-group mb-3">
+                <label className="form-label">Current Password</label>
+                <input type="password" name="oldPass" className="form-input" required />
+              </div>
+              <div className="form-group mb-3">
+                <label className="form-label">New Password</label>
+                <input type="password" name="newPass" className="form-input" required minLength={6} />
+              </div>
+              <button type="submit" className="btn btn-primary">Update Password</button>
+            </form>
           </div>
         </div>
       )}

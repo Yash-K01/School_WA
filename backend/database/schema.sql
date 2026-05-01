@@ -286,6 +286,7 @@ CREATE TABLE documents (
   ),
   file_name VARCHAR(255) NOT NULL,
   file_path VARCHAR(500) NOT NULL,
+  document_number VARCHAR(255),
   file_size INT,
   mime_type VARCHAR(100),
   uploaded_by VARCHAR(100),
@@ -932,8 +933,9 @@ CREATE TABLE application_documents (
       'other'
     )
   ),
-  file_name VARCHAR(255) NOT NULL,
-  file_path VARCHAR(500) NOT NULL,
+  file_name VARCHAR(255),
+  file_path VARCHAR(500),
+  document_number VARCHAR(255),
   file_size INT,
   mime_type VARCHAR(100),
   verification_status VARCHAR(50) DEFAULT 'pending' CHECK (
@@ -1139,6 +1141,7 @@ INSERT INTO communication_log (
     clicked_at,
     created_by
   )
+  
 VALUES (
     1,
     'lead',

@@ -55,6 +55,7 @@ const normalizeFileRecord = (record) => {
     file_name: record.file_name || record.name || (filePath ? path.basename(String(filePath)) : null),
     file_path: publicPath,
     file_url: publicPath,
+    document_number: record.document_number || record.documentNumber || null,
   };
 };
 
@@ -62,9 +63,16 @@ const ensureApplicationFileConstraints = async (client) => {
   await client.query(`
     ALTER TABLE application_documents
       ADD COLUMN IF NOT EXISTS file_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS document_number VARCHAR(255),
       ADD COLUMN IF NOT EXISTS uploaded_by BIGINT,
       ADD COLUMN IF NOT EXISTS verified_by BIGINT,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  await client.query(`
+    ALTER TABLE application_documents
+      ALTER COLUMN file_name DROP NOT NULL,
+      ALTER COLUMN file_path DROP NOT NULL
   `);
 
   await client.query(`
@@ -301,7 +309,7 @@ export const getApplicationCounts = async (schoolId) => {
        COUNT(*) FILTER (WHERE status = 'under_review') AS under_review,
        COUNT(*) FILTER (WHERE status = 'approved') AS approved,
        COUNT(*) FILTER (WHERE status = 'waitlisted') AS waitlisted,
-       COUNT(*) FILTER (WHERE status = 'in_progress') AS draft
+       COUNT(*) FILTER (WHERE status IN ('in_progress', 'draft')) AS draft
      FROM application
      WHERE school_id = $1`,
     [schoolId],
@@ -329,7 +337,7 @@ export const getDraftApplications = async (schoolId) => {
      FROM application a
      LEFT JOIN application_student_info asi ON asi.application_id = a.id
      WHERE school_id = $1
-       AND status = 'in_progress'
+       AND status IN ('in_progress', 'draft')
      ORDER BY updated_at DESC`,
     [schoolId],
   );
@@ -410,9 +418,9 @@ export const getEligibleLeadsForApplication = async (schoolId, filters = {}) => 
     WHERE l.school_id = $1
       AND NOT EXISTS (
         SELECT 1
-        FROM application a
+        FROM admission a
         WHERE a.lead_id = l.id
-          AND a.status = 'submitted'
+          AND a.status IN ('submitted', 'draft')
       )
   `;
 
@@ -775,6 +783,9 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     const stage = String(payload.stage || 'all').toLowerCase();
     const photosPayload = payload.photos && typeof payload.photos === 'object' ? payload.photos : {};
     const documentsPayload = payload.documents && typeof payload.documents === 'object' ? payload.documents : {};
+    const documentNumbersPayload = payload.documentNumbers && typeof payload.documentNumbers === 'object'
+      ? payload.documentNumbers
+      : {};
 
     const inputDocumentTypes = Object.keys(documentsPayload);
     const invalidInputDocumentTypes = inputDocumentTypes
@@ -852,27 +863,51 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
       const uploaded = resolveUploadedFile(`document_${safeDocumentType}`) || resolveUploadedFile(safeDocumentType);
       const existing = uploaded || resolveExistingFile(value);
 
-      if (!existing?.file_path) {
+      const documentNumber = String(
+        value?.document_number
+        ?? value?.documentNumber
+        ?? documentNumbersPayload[safeDocumentType]
+        ?? '',
+      ).trim() || null;
+
+      if (!existing?.file_path && !documentNumber) {
         return;
       }
 
+      const existingRowResult = await client.query(
+        `SELECT file_name, file_path, file_size, mime_type, document_number
+         FROM application_documents
+         WHERE application_id = $1 AND document_type = $2
+         LIMIT 1`,
+        [resolvedApplicationId, safeDocumentType],
+      );
+      const existingRow = existingRowResult.rows[0] || null;
+
+      const nextFileName = existing?.file_name || existingRow?.file_name || null;
+      const nextFilePath = existing?.file_path || existingRow?.file_path || null;
+      const nextFileSize = existing ? (existing.file_size ?? null) : (existingRow?.file_size ?? null);
+      const nextMimeType = existing ? (existing.mime_type ?? null) : (existingRow?.mime_type ?? null);
+      const nextDocumentNumber = documentNumber || existingRow?.document_number || null;
+
       await client.query(
         `INSERT INTO application_documents
-         (application_id, document_type, file_name, file_path, file_size, mime_type)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         (application_id, document_type, file_name, file_path, file_size, mime_type, document_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (application_id, document_type) DO UPDATE
          SET file_name = EXCLUDED.file_name,
              file_path = EXCLUDED.file_path,
              file_size = EXCLUDED.file_size,
              mime_type = EXCLUDED.mime_type,
+             document_number = EXCLUDED.document_number,
              updated_at = CURRENT_TIMESTAMP`,
         [
           resolvedApplicationId,
           safeDocumentType,
-          existing.file_name || path.basename(existing.file_path),
-          existing.file_path,
-          existing.file_size || null,
-          existing.mime_type || null,
+          nextFileName || (nextFilePath ? path.basename(nextFilePath) : null),
+          nextFilePath,
+          nextFileSize,
+          nextMimeType,
+          nextDocumentNumber,
         ],
       );
     };
@@ -892,6 +927,27 @@ export const saveDocuments = async (applicationId, payload = {}, uploadedFiles =
     }
 
     if (stage === 'documents' || stage === 'all') {
+      const documentTypesToSave = Array.from(new Set([
+        ...Object.keys(documentsPayload),
+        ...Object.keys(documentNumbersPayload),
+      ]));
+
+      const missingDocumentNumbers = documentTypesToSave.filter((documentType) => {
+        const normalizedTypeResult = normalizeApplicationDocumentType(documentType);
+        const safeDocumentType = normalizedTypeResult.normalized;
+        const numberValue = String(
+          documentsPayload?.[safeDocumentType]?.document_number
+          ?? documentsPayload?.[safeDocumentType]?.documentNumber
+          ?? documentNumbersPayload?.[safeDocumentType]
+          ?? '',
+        ).trim();
+        return !numberValue;
+      });
+
+      if (missingDocumentNumbers.length > 0) {
+        throw new Error(`document_number is required for: ${missingDocumentNumbers.join(', ')}`);
+      }
+
       for (const [documentType, value] of Object.entries(documentsPayload)) {
         await upsertApplicationDocument(documentType, value);
       }
@@ -1557,6 +1613,77 @@ export const completeAdmissionApplication = async (schoolId, admissionId) => {
   } catch (error) {
     await client.query('ROLLBACK');
     throw new Error(`Failed to complete admission application: ${error.message}`);
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Delete a draft application
+ * Only allows deletion if status is 'draft'
+ */
+export const deleteApplication = async (schoolId, applicationId) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Fetch the application to verify status and ownership
+    const appQuery = `
+      SELECT id, school_id, status
+      FROM application
+      WHERE id = $1 AND school_id = $2
+    `;
+
+    const appResult = await client.query(appQuery, [applicationId, schoolId]);
+
+    if (!appResult.rows.length) {
+      throw new Error('Application not found');
+    }
+
+    const application = appResult.rows[0];
+
+    // Verify that the application is still a draft/in-progress record
+    if (!['draft', 'in_progress'].includes(application.status)) {
+      throw new Error(`Cannot delete application with status '${application.status}'. Only draft applications can be deleted.`);
+    }
+
+    // Delete associated documents (will cascade delete via FK constraints)
+    await client.query(
+      'DELETE FROM application_documents WHERE application_id = $1',
+      [applicationId]
+    );
+
+    // Delete associated photos (will cascade delete via FK constraints)
+    await client.query(
+      'DELETE FROM application_photos WHERE application_id = $1',
+      [applicationId]
+    );
+
+    // Delete the application itself
+    const deleteQuery = `
+      DELETE FROM application 
+      WHERE id = $1 AND school_id = $2 
+      AND status IN ('draft', 'in_progress') 
+      RETURNING id`, 
+      [applicationId, schoolId]
+    `;
+
+    const deleteResult = await client.query(deleteQuery, [applicationId, schoolId]);
+
+    if (!deleteResult.rows.length) {
+      throw new Error('Failed to delete application');
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      id: deleteResult.rows[0].id,
+      message: 'Application deleted successfully'
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }

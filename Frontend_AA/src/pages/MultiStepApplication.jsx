@@ -238,6 +238,7 @@ export function MultiStepApplication() {
   // Step 4 & 5: Files
   const [photos, setPhotos] = useState([]);
   const [documents, setDocuments] = useState({});
+  const [documentNumbers, setDocumentNumbers] = useState({});
 
   // Initialize forms from application details and lead data (auto-fill)
   useEffect(() => {
@@ -460,14 +461,14 @@ export function MultiStepApplication() {
 
         const today = new Date();
         const maxDate = new Date(
-          today.getFullYear() - 4,
+          today.getFullYear() - 2,
           today.getMonth(),
           today.getDate(),
         );
 
         if (new Date(studentForm.date_of_birth) > maxDate) {
           markInvalidAndFocus({ student_date_of_birth: true });
-          setMoveError("Minimum age should be 4 years.");
+          setMoveError("Minimum age should be 2 years.");
           setSaving(false);
           return;
         }
@@ -552,13 +553,12 @@ export function MultiStepApplication() {
           documents: {},
         });
       } else if (step === 5) {
-        const missingDocType = REQUIRED_DOCUMENT_TYPES.find(
-          (docType) => !documents[docType],
+        const missingDocumentNumbers = REQUIRED_DOCUMENT_TYPES.filter(
+          (docType) => !String(documentNumbers[docType] || "").trim(),
         );
 
-        if (missingDocType) {
-          focusField(`document_${missingDocType}`);
-          setMoveError("Please upload all mandatory documents.");
+        if (missingDocumentNumbers.length > 0) {
+          setMoveError("Document number is required for every document type.");
           setSaving(false);
           return;
         }
@@ -572,6 +572,7 @@ export function MultiStepApplication() {
               photos.find((p) => p.type === "passport_photos") || null,
           },
           documents,
+          documentNumbers,
         });
       }
 
@@ -1091,7 +1092,20 @@ export function MultiStepApplication() {
       {step === 2 && (
         <ParentForm
           applicationId={appId || applicationId}
-          lead={details?.lead || details?.application}
+          lead={{
+            father_name:
+              details?.parent_info?.father_name ||
+              details?.application?.lead_father_name ||
+              "",
+            father_phone:
+              details?.parent_info?.father_phone ||
+              details?.application?.lead_phone ||
+              "",
+            father_email:
+              details?.parent_info?.father_email ||
+              details?.application?.lead_email ||
+              "",
+          }}
           initialData={details?.parent_info}
           onSuccess={() => setStep(3)}
         />
@@ -1405,38 +1419,60 @@ export function MultiStepApplication() {
               { key: "address_proof", label: "Address Proof" },
               { key: "parent_id_proof", label: "Parent ID Proof" },
             ].map((doc) => (
-              <div className="form-group mb-3" key={doc.key}>
+              <div className="form-group mb-4" key={doc.key}>
                 <label className="form-label">
-                  {doc.label} <span className="req">*</span>
+                  {doc.label}
                 </label>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input
-                    id={`document_${doc.key}`}
-                    type="file"
-                    className="form-input"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) =>
-                      handleDocumentUpload(doc.key, e.target.files?.[0])
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => openPreview(documents[doc.key], doc.label)}
-                    disabled={!documents[doc.key]}
+                <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 8 }}>
+                  (Optional - provide file, document number, or both)
+                </div>
+                
+                {/* File Upload Section */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input
+                      id={`document_${doc.key}`}
+                      type="file"
+                      className="form-input"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) =>
+                        handleDocumentUpload(doc.key, e.target.files?.[0])
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => openPreview(documents[doc.key], doc.label)}
+                      disabled={!documents[doc.key]}
+                    >
+                      View
+                    </button>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "var(--gray-500)",
+                    }}
                   >
-                    View
-                  </button>
+                    {documents[doc.key]?.name || "No file selected"}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 12,
-                    color: "var(--gray-500)",
-                  }}
-                >
-                  {documents[doc.key]?.name || "No file selected"}
-                </div>
+
+                {/* Document Number Section */}
+                <input
+                  type="text"
+                  className="form-input"
+                  required
+                  placeholder={`Enter ${doc.label} number (e.g., roll number, ID number)`}
+                  value={documentNumbers[doc.key] || ""}
+                  onChange={(e) =>
+                    setDocumentNumbers((prev) => ({
+                      ...prev,
+                      [doc.key]: e.target.value,
+                    }))
+                  }
+                />
               </div>
             ))}
 

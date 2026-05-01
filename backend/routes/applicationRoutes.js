@@ -79,6 +79,12 @@ router.post(
 router.post('/:id/submit', applicationController.submitApplication);
 
 /**
+ * DELETE /api/applications/:id
+ * Delete draft application (only allows deletion if status is 'draft')
+ */
+router.delete('/:id', applicationController.deleteApplication);
+
+/**
  * Alias endpoint for compatibility with /api/admission/:id
  */
 router.get('/:id', applicationController.getApplicationDetails);

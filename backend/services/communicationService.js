@@ -88,15 +88,14 @@ const resolveRecipient = async (schoolId, recipientType, recipientId) => {
 
 const normalizeScheduleType = (value) => String(value || '').trim().toLowerCase();
 
-const buildComposeLogPayload = ({ schoolId, userId, recipients, subject, message, attachments }) => ({
+const buildComposeLogPayload = ({ schoolId, userId, recipientType, recipientId, subject, message, channel = 'email' }) => ({
   school_id: schoolId,
-  sender_id: userId,
-  recipient_type: 'email',
-  recipient_id: null,
-  recipient_email: recipients.join(','),
+  created_by: userId,
+  recipient_type: recipientType,
+  recipient_id: recipientId,
+  channel,
   subject,
   message,
-  attachments: attachments || [],
   status: 'sent',
 });
 
@@ -203,6 +202,8 @@ export const sendCommunication = async (schoolId, userId, payload = {}, files = 
   const attachmentMetadata = mapAttachmentMetadata(files);
   const scheduleType = normalizeScheduleType(payload.scheduleType);
   const composeRecipient = resolveComposeRecipient(payload);
+  const channel = payload.channel || 'email';
+  assertValidChannel(channel);
 
   if (!subject) {
     throw new AppError('subject is required.', 400);
@@ -261,13 +262,12 @@ export const sendCommunication = async (schoolId, userId, payload = {}, files = 
       ...buildComposeLogPayload({
         schoolId,
         userId,
-        recipients,
+        recipientType: composeRecipient.recipient_type,
+        recipientId: composeRecipient.recipient_id,
         subject,
         message,
-        attachments: attachmentMetadata,
+        channel,
       }),
-      recipient_type: composeRecipient.recipient_type,
-      recipient_id: composeRecipient.recipient_id,
     },
   );
 

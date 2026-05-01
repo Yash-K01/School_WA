@@ -582,3 +582,55 @@ export const completeAdmission = async (req, res) => {
     });
   }
 };
+
+/**
+ * Delete application
+ * DELETE /api/applications/:id
+ * Validates that application status is 'draft' before allowing deletion
+ */
+export const deleteApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { school_id } = req.user;
+
+    console.log(`🗑️  DELETE /api/applications/${id} - User: ${req.user.id}, School: ${school_id}`);
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Application ID is required'
+      });
+    }
+
+    const result = await applicationService.deleteApplication(school_id, id);
+
+    console.log(`✅ Application ${id} deleted successfully`);
+    res.status(200).json({
+      success: true,
+      message: 'Application deleted successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ Error deleting application:', error.message);
+    
+    // Return appropriate status codes based on error type
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error.message.includes('Cannot delete')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to delete application'
+    });
+  }
+};

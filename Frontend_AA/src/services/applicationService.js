@@ -331,6 +331,12 @@ export async function submitApplication(applicationId) {
   });
 }
 
+export async function deleteApplication(applicationId) {
+  return request(`${BASE_URL}/${applicationId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function mapStepNumberToKey(stepNumber) {
   return NUMBER_TO_STEP[stepNumber] || 'student';
 }

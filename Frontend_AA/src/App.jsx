@@ -19,6 +19,7 @@ import { Reports } from "./pages/Reports";
 import { Security } from "./pages/Security";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
+import { AdminPortal } from "./pages/AdminPortal";
 import { isAuthenticated } from "./utils/authToken.js";
 
 // Protected route component - redirects to login if not authenticated
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="security" element={<Security />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="admin" element={<AdminPortal />} />
         </Route>
       </Routes>
     </BrowserRouter>

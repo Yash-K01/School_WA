@@ -19,6 +19,7 @@ const navItems = [
   { path: "/enrollment",    label: "Enrollment",          icon: GraduationCap },
   { path: "/reports",       label: "Reports",             icon: BarChart3 },
   { path: "/security",      label: "Security & Compliance", icon: Shield },
+  { path: "/admin",         label: "Admin Portal",        icon: Shield },
   { path: "/settings",      label: "Settings",            icon: SettingsIcon },
 ];
 

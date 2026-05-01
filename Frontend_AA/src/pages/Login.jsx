@@ -7,6 +7,7 @@ import { setToken, setUserData } from "../utils/authToken.js";
 export function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -93,9 +94,19 @@ export function Login() {
         >
           Login
         </h1>
-        <p style={{ fontSize: 14, color: "var(--gray-500)", marginBottom: 24 }}>
-          Enter your credentials to access the system
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <p style={{ fontSize: 14, color: "var(--gray-500)", margin: 0 }}>
+            Enter your credentials to access the system
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: 13, color: isAdminLogin ? 'var(--gray-500)' : 'var(--primary)', fontWeight: isAdminLogin ? 'normal' : '500' }}>Staff</span>
+            <label className="toggle">
+              <input type="checkbox" checked={isAdminLogin} onChange={e => setIsAdminLogin(e.target.checked)} />
+              <span className="toggle-slider"></span>
+            </label>
+            <span style={{ fontSize: 13, color: isAdminLogin ? 'var(--primary)' : 'var(--gray-500)', fontWeight: isAdminLogin ? '500' : 'normal' }}>Admin</span>
+          </div>
+        </div>
 
         {error && (
           <div
@@ -202,7 +213,7 @@ export function Login() {
         >
           Test Credentials:
           <br />
-          Email: admin@test.com
+          Email: {isAdminLogin ? "admin@test.com" : "staff@test.com"}
           <br />
           Password: 123456
         </p>

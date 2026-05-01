@@ -6,7 +6,8 @@ import {
   saveParentInfo,
   saveAcademicInfo,
   saveDocuments,
-  submitApplication
+  submitApplication,
+  deleteApplication as deleteApplicationApi
 } from '../services/applicationService.js';
 
 /**
@@ -180,6 +181,25 @@ export function useApplication(applicationId) {
     return Number(currentStep || progress.current_step || 1) > step;
   };
 
+  // Delete application (only allowed for draft status)
+  const deleteApplication = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      await deleteApplicationApi(effectiveApplicationId);
+
+      console.log('✅ Application deleted successfully');
+      return true;
+    } catch (err) {
+      console.error('❌ Error deleting application:', err);
+      setError(err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     applicationId: effectiveApplicationId,
     progress,
@@ -192,6 +212,7 @@ export function useApplication(applicationId) {
     handleSaveParentInfo,
     handleSaveAcademicInfo,
     handleSaveDocuments,
-    handleSubmitApplication
+    handleSubmitApplication,
+    deleteApplication
   };
 }

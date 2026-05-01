@@ -147,6 +147,14 @@ export const touchTemplateLastUsedWithClient = async (client, templateId, school
 };
 
 export const createCommunicationLog = async (client, payload) => {
+  if (!payload?.recipient_type) {
+    throw new Error('recipient_type is required for communication log insertion.');
+  }
+
+  if (!payload?.recipient_id) {
+    throw new Error('recipient_id is required for communication log insertion.');
+  }
+
   const result = await client.query(
     `INSERT INTO communication_log (
       school_id, recipient_type, recipient_id, channel, subject, message, status,
@@ -220,25 +228,25 @@ export const getCommunicationLogs = async (schoolId, filters, pagination) => {
     `SELECT
       cl.*,
       CASE
-        WHEN cl.recipient_type = 'lead' THEN (
-          SELECT TRIM(CONCAT(COALESCE(l.first_name, ''), ' ', COALESCE(l.last_name, '')))
-          FROM lead l
-          WHERE l.id = cl.recipient_id AND l.school_id = cl.school_id
-        )
-        WHEN cl.recipient_type = 'student' THEN (
-          SELECT TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, '')))
-          FROM student s
-          WHERE s.id = cl.recipient_id AND s.school_id = cl.school_id
-        )
-        WHEN cl.recipient_type = 'parent' THEN (
-          SELECT TRIM(CONCAT(COALESCE(pd.first_name, ''), ' ', COALESCE(pd.last_name, '')))
-          FROM parent_detail pd
-          WHERE pd.id = cl.recipient_id AND pd.school_id = cl.school_id
-        )
+        WHEN cl.recipient_type = 'lead' THEN TRIM(CONCAT(COALESCE(l.first_name, ''), ' ', COALESCE(l.last_name, '')))
+        WHEN cl.recipient_type = 'student' THEN TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, '')))
+        WHEN cl.recipient_type = 'parent' THEN TRIM(CONCAT(COALESCE(pd.first_name, ''), ' ', COALESCE(pd.last_name, '')))
         ELSE NULL
       END AS recipient_name,
       u.name AS created_by_name
     FROM communication_log cl
+    LEFT JOIN lead l
+      ON cl.recipient_type = 'lead'
+      AND l.id = cl.recipient_id
+      AND l.school_id = cl.school_id
+    LEFT JOIN student s
+      ON cl.recipient_type = 'student'
+      AND s.id = cl.recipient_id
+      AND s.school_id = cl.school_id
+    LEFT JOIN parent_detail pd
+      ON cl.recipient_type = 'parent'
+      AND pd.id = cl.recipient_id
+      AND pd.school_id = cl.school_id
     LEFT JOIN app_user u ON u.id::text = cl.created_by::text AND u.school_id = cl.school_id
     WHERE ${whereSql}
     ORDER BY cl.created_at DESC, cl.id DESC
@@ -401,8 +409,12 @@ export const createSimpleCommunicationLog = async (payload) => {
     throw new Error('school_id is required for communication log insertion.');
   }
 
-  if (!payload?.sender_id) {
-    throw new Error('sender_id is required for communication log insertion.');
+  if (!(payload?.created_by || payload?.sender_id)) {
+    throw new Error('created_by is required for communication log insertion.');
+  }
+
+  if (!payload?.recipient_type) {
+    throw new Error('recipient_type is required for communication log insertion.');
   }
 
   if (!payload?.recipient_id) {
@@ -412,29 +424,25 @@ export const createSimpleCommunicationLog = async (payload) => {
   const result = await pool.query(
     `INSERT INTO communication_log (
       school_id,
-      created_by,
       recipient_type,
       recipient_id,
-      recipient_email,
       channel,
       subject,
       message,
       status,
-      attachments
+      created_by
     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       payload.school_id,
-      payload.sender_id,
       payload.recipient_type,
       payload.recipient_id,
-      payload.recipient_email,
-      'email',
-      payload.subject,
-      payload.message,
+      payload.channel || 'email',
+      payload.subject || null,
+      payload.message || null,
       payload.status || 'sent',
-      JSON.stringify(payload.attachments || [])
+      payload.created_by || payload.sender_id
     ]
   );
 

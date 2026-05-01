@@ -47,6 +47,7 @@ Frontend_AA/
 │   │   └── useUpcomingFollowups.js  # Custom hook for follow-ups
 │   ├── pages/                       # page-level views (route targets)
 │   │   ├── AddLead.jsx              # Add new lead form
+│   │   ├── AdminPortal.jsx          # Admin user management dashboard
 │   │   ├── Applications.jsx         # Applications list and management
 │   │   ├── Communication.jsx        # Communication tools
 │   │   ├── Counseling.jsx           # Counseling dashboard
@@ -118,6 +119,7 @@ Protected shell (requires `isAuthenticated()`)
 - `/enrollment` → `Enrollment.jsx`
 - `/reports` → `Reports.jsx`
 - `/security` → `Security.jsx`
+- `/admin` → `AdminPortal.jsx`
 - `/settings` → `Settings.jsx`
 
 **NEW Application Workflow Routes:**

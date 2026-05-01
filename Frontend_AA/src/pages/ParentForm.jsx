@@ -61,26 +61,20 @@ export default function ParentForm({
       phone: lead.phone,
     });
 
-    // Build father name from lead (assuming lead contact is typically parent)
-    const fatherFirstName = lead.lead_first_name || lead.first_name || "";
-    const fatherLastName = lead.lead_last_name || lead.last_name || "";
-    const fatherFullName = [fatherFirstName, fatherLastName]
-      .filter((n) => n)
-      .join(" ");
-
-    // Use lead_ prefixed fields (from application) or fallback to unprefixed (from direct lead object)
-    const leadPhone = lead.lead_phone || lead.phone || "";
-    const leadEmail = lead.lead_email || lead.email || "";
+    // NOTE: Lead data contains student information, not parent information
+    // Parent fields should be left empty for manual entry unless parent data is explicitly provided
+    // Only use lead contact information (phone, email) if available
+    const leadPhone = lead.father_phone || lead.lead_phone || lead.phone || "";
+    const leadEmail = lead.father_email || lead.lead_email || lead.email || "";
 
     setForm((f) => ({
       ...f,
-      fatherName: fatherFullName || f.fatherName,
+      fatherName: lead.father_name || lead.fatherName || f.fatherName,
       fatherPhone: leadPhone || f.fatherPhone,
       fatherEmail: leadEmail || f.fatherEmail,
     }));
 
-    console.log("✅ [ParentForm] Auto-filled from lead data:", {
-      fatherName: fatherFullName,
+    console.log("✅ [ParentForm] Auto-filled contact info from lead:", {
       fatherPhone: leadPhone,
       fatherEmail: leadEmail,
     });
