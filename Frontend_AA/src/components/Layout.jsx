@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, TrendingUp, MessageSquare, UserCheck, FileText, ClipboardCheck, Award, CreditCard, GraduationCap, BarChart3, Shield, Settings as SettingsIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { LogoutButton } from "./LogoutButton";
 import schoolLogo from "../assets/school-logo.png";
 import sLogo from "../assets/sc-logo.png";
 import Full from "../assets/full.png";
@@ -85,7 +86,8 @@ export function Layout() {
           })}
         </nav>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <LogoutButton collapsed={collapsed} />
           <button className="collapse-btn" onClick={toggleCollapse}>
             {collapsed ? <ChevronRight size={18} /> : <><ChevronDown size={18} /><span>Collapse</span></>}
           </button>
