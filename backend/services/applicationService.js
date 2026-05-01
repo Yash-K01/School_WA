@@ -1663,7 +1663,7 @@ export const deleteApplication = async (schoolId, applicationId) => {
     // Delete the application itself
     const deleteQuery = `
       DELETE FROM application
-      WHERE id = $1 AND school_id = $2 AND status = 'draft'
+      WHERE id = $1 AND school_id = $2 AND status = ('in_progress')
       RETURNING id, school_id, status
     `;
 

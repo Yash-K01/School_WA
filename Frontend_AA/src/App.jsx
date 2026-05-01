@@ -20,11 +20,21 @@ import { Security } from "./pages/Security";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { AdminPortal } from "./pages/AdminPortal";
-import { isAuthenticated } from "./utils/authToken.js";
+import { isAuthenticated, getUserData } from "./utils/authToken.js";
 
 // Protected route component - redirects to login if not authenticated
 function ProtectedRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
+}
+
+// Admin protected route component - redirects to dashboard if not admin
+function AdminProtectedRoute({ children }) {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  const user = getUserData();
+  if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+    return children;
+  }
+  return <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -65,7 +75,11 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="security" element={<Security />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="admin" element={<AdminPortal />} />
+          <Route path="admin" element={
+            <AdminProtectedRoute>
+              <AdminPortal />
+            </AdminProtectedRoute>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>

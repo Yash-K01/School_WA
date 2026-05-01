@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Key, X, Check, Shield } from "lucide-react";
-import { fetchUsers, createUser, resetUserPassword } from "../services/userService.js";
+import { Search, Plus, Key, X, Check, Shield, Trash2, CheckCircle } from "lucide-react";
+import { fetchAdminUsers, createAdminUser, updateAdminUserPassword, deleteAdminUser } from "../services/adminService.js";
 import "../style.css";
 
 export function AdminPortal() {
@@ -17,6 +17,12 @@ export function AdminPortal() {
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "counselor" });
   const [resetPassword, setResetPassword] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [successToast, setSuccessToast] = useState("");
+
+  const showToast = (message) => {
+    setSuccessToast(message);
+    setTimeout(() => setSuccessToast(""), 3000);
+  };
 
   useEffect(() => {
     loadUsers();
@@ -25,7 +31,7 @@ export function AdminPortal() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const data = await fetchUsers();
+      const data = await fetchAdminUsers();
       setUsers(data);
       setError("");
     } catch (err) {
@@ -39,10 +45,11 @@ export function AdminPortal() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await createUser(newUser);
+      await createAdminUser(newUser);
       setShowCreateModal(false);
       setNewUser({ name: "", email: "", password: "", role: "counselor" });
       loadUsers();
+      showToast("User Created successfully!");
     } catch (err) {
       alert(err.message || "Failed to create user");
     } finally {
@@ -54,14 +61,25 @@ export function AdminPortal() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await resetUserPassword(showResetModal, resetPassword);
+      await updateAdminUserPassword(showResetModal, resetPassword);
       setShowResetModal(null);
       setResetPassword("");
-      alert("Password reset successfully");
+      showToast("Password Successfully Changed!");
     } catch (err) {
       alert(err.message || "Failed to reset password");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await deleteAdminUser(userId);
+      loadUsers();
+      showToast("User Deleted successfully!");
+    } catch (err) {
+      alert(err.message || "Failed to delete user");
     }
   };
 
@@ -101,6 +119,12 @@ export function AdminPortal() {
         </div>
         
         <div className="card-body" style={{ padding: 0 }}>
+          {successToast && (
+            <div style={{ margin: "20px", background: "#dcfce7", border: "1px solid #86efac", borderRadius: "var(--r)", padding: "12px 16px", display: "flex", gap: 12 }}>
+              <CheckCircle size={20} style={{ color: "#16a34a", flexShrink: 0 }} />
+              <div style={{ color: "#15803d", fontSize: 14 }}>{successToast}</div>
+            </div>
+          )}
           {error && <div style={{ padding: "20px", color: "red" }}>{error}</div>}
           
           <div className="table-responsive">
@@ -146,14 +170,24 @@ export function AdminPortal() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setShowResetModal(user.id)}
-                          title="Reset Password"
-                        >
-                          <Key size={14} />
-                          <span>Reset</span>
-                        </button>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => setShowResetModal(user.id)}
+                            title="Reset Password"
+                          >
+                            <Key size={14} />
+                            <span>Reset</span>
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                            title="Delete User"
+                            style={{ borderColor: "#fee2e2", color: "#dc2626" }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
