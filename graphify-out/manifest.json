@@ -1,0 +1,618 @@
+{
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\app.js": {
+    "mtime": 1777615684.0167668,
+    "hash": "47eca84cedfd2079d40fd5bd1332d8b2"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\check-app-tables.js": {
+    "mtime": 1775051539.210002,
+    "hash": "7ea0150d62416e08a32a51d76675351a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\check-parts.js": {
+    "mtime": 1774955209.013124,
+    "hash": "55dd90e9e996eff73b5489874e144d63"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\check-user.js": {
+    "mtime": 1774955209.4237275,
+    "hash": "4ba6c4f611eb0eb9b8d31257bf2764ae"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\debug-all-failures.js": {
+    "mtime": 1774955207.9277894,
+    "hash": "c6bb973758f3da3e3a77dfd07f8ca284"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\debug-app-setup.js": {
+    "mtime": 1775051539.210002,
+    "hash": "c2bf9967bd2eb33fc0ae367b46e202c9"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\debug-setup.js": {
+    "mtime": 1774952649.6366239,
+    "hash": "9ceca588cc469d506f6c001ec7547a01"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\debug-split.js": {
+    "mtime": 1774955208.29616,
+    "hash": "522128cb00b7ad90654e4f32c8918bfe"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\debug-statements.js": {
+    "mtime": 1774955208.102334,
+    "hash": "1bc1f55d9b7fdce62679a3383500b086"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\fetch-compare.js": {
+    "mtime": 1774955209.5788074,
+    "hash": "a00dff7262bda64728d244c4f3779b5b"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\find-tables.js": {
+    "mtime": 1774955208.2208774,
+    "hash": "d3d10fe72f936a948ed118b1a542a322"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\inspect-lines.js": {
+    "mtime": 1774955208.927107,
+    "hash": "ab378d48ede3320233503f184aedee19"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\inspect-statements.js": {
+    "mtime": 1774955208.6614203,
+    "hash": "098c589d1e5fcaeeae7e4551b3efca0b"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\login-test.js": {
+    "mtime": 1774955209.592945,
+    "hash": "9462a5ca76103cd9f6088be630c026a0"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\migrate-add-lead-id.js": {
+    "mtime": 1773562870.1381338,
+    "hash": "c436c7472eba3ee154307c3c0c4df5fe"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\migrate-add-progress-docs.js": {
+    "mtime": 1773562876.1768303,
+    "hash": "16a8dd1c7f930dd5644895ac50f31c1f"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\migrate-fix-constraints.js": {
+    "mtime": 1773562914.0652938,
+    "hash": "19ac33cea49796ccd023b5e0dfd2397f"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\run-application-migration.js": {
+    "mtime": 1775051539.210002,
+    "hash": "175a9e66b7194ba51f5f2102da2dd3d2"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\seed-test-data.js": {
+    "mtime": 1774955209.216259,
+    "hash": "db2216d10fe25c4778e6d1e5fca88c7a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\server.js": {
+    "mtime": 1777295955.7097123,
+    "hash": "ad66599a8911e7bfe128cca9d63ea569"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\setup-db-final.js": {
+    "mtime": 1774955209.108676,
+    "hash": "56d35f72d9bb8b3cc20ca45e075184ab"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\setup-db-v2.js": {
+    "mtime": 1774955208.39772,
+    "hash": "2a695e26e70e345d729643ebc856f81c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\setup-db.js": {
+    "mtime": 1774955207.9022365,
+    "hash": "d120e153f7607703954a717bc4e86878"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\setup-photos-table.js": {
+    "mtime": 1775051539.210002,
+    "hash": "687bd6b8fa215e554e1479c2fcca3bbc"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\test-connection.js": {
+    "mtime": 1774952647.8426704,
+    "hash": "0068f80b500b21e98f8e890d02d40609"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\tmp_check.js": {
+    "mtime": 1775995133.6249864,
+    "hash": "59f6dbe4a1fffc4ad5a413184c3fa9ce"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\tmp_fix_db.js": {
+    "mtime": 1774885810.661302,
+    "hash": "30f5c55368fb4beb72bd960092a48448"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\update-admin-pass.js": {
+    "mtime": 1774955209.5498226,
+    "hash": "c32ad3ae48588d48ef483e8b4a8a26dd"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\config\\db.js": {
+    "mtime": 1775298416.143234,
+    "hash": "cb6fa353976584f255dd3cd9f3f72fd7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\config\\mailer.js": {
+    "mtime": 1777297362.8643136,
+    "hash": "29173a777e75ccd0140872d585fa14b3"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\adminController.js": {
+    "mtime": 1777615669.3773208,
+    "hash": "8ad0f540591d76763cf4f365f9528f56"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\admissionController.js": {
+    "mtime": 1775492766.350021,
+    "hash": "6ca99cff277799c27af9701bead053d4"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\applicationController.js": {
+    "mtime": 1777306880.9523704,
+    "hash": "5cef5428d704f6a3badef619945d4159"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\authController.js": {
+    "mtime": 1774949443.23263,
+    "hash": "8aa1fb783d102ba7f7f0ce5a8060e65c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\campaign.controller.js": {
+    "mtime": 1775995979.4054215,
+    "hash": "3b40f3ec19b6e98f4a72ca278ae5286c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\campaignController.js": {
+    "mtime": 1775989952.642827,
+    "hash": "ef4684c7f9d629405e25eb83eda924e1"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\communicationController.js": {
+    "mtime": 1777299681.6633062,
+    "hash": "84106fe67b26da877a27cbd41b795914"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\counselingController.js": {
+    "mtime": 1777622401.622962,
+    "hash": "3b74e5df29b7078fc3b96f41ef43de71"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\email.controller.js": {
+    "mtime": 1777207871.8691351,
+    "hash": "a20535cfbf14a6eb669daba63d9600f3"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\leadController.js": {
+    "mtime": 1775491574.0116417,
+    "hash": "0870f0c2ebfda77c9353dc13426d1c86"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\parentController.js": {
+    "mtime": 1773566643.5018518,
+    "hash": "188d953802a1634c9dcb9472729173b0"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\schoolController.js": {
+    "mtime": 1777294024.0218987,
+    "hash": "a7fd361823f44e9d738e3a561681e565"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\sms.controller.js": {
+    "mtime": 1775995979.4054215,
+    "hash": "7de5b9cb070711c13d441392167f0a4c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\studentController.js": {
+    "mtime": 1773507808.5228152,
+    "hash": "29aed10f2a15b167c7bffdf17b6cb9e3"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\templateController.js": {
+    "mtime": 1775989952.6358297,
+    "hash": "81cce5c473f6e64113d7e74814e58eda"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\userController.js": {
+    "mtime": 1777613631.6711504,
+    "hash": "237bf9fd8f7b7b136cbb35b54801c53d"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\controllers\\whatsapp.controller.js": {
+    "mtime": 1775995979.4054215,
+    "hash": "fa964b005254b2de31be6f935c64c2f4"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-add-document-number.sql": {
+    "mtime": 1777306839.3748114,
+    "hash": "760442c41e36d8597a64b611b5af3e02"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-add-email-indexes.sql": {
+    "mtime": 1775990694.5056293,
+    "hash": "ca972182ae81a8170a0acf8bedcc1085"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-add-followup-indexes.sql": {
+    "mtime": 1775392755.4701226,
+    "hash": "998cc2b8e7281622daebaa922633f83a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-add-scheduled-emails.sql": {
+    "mtime": 1777303706.6842773,
+    "hash": "7da25737c8228de8e79112ad6654d588"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-add-sms-whatsapp-campaign-support.sql": {
+    "mtime": 1775995984.2873046,
+    "hash": "a8d302ec9d08a2af6f958a6612b6bb65"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-admission-resume-workflow.sql": {
+    "mtime": 1776073739.2270675,
+    "hash": "1298f0c36f1b174d6510996f1c98e13c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-application-parent-constraints.sql": {
+    "mtime": 1776266565.5149853,
+    "hash": "e4db39308e6840199170dc191bed069e"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-fix-application-documents-constraints.sql": {
+    "mtime": 1776357478.3171778,
+    "hash": "bdd9a98037de52ac366ae7e42221bd9e"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-fix-application-documents-document-types.sql": {
+    "mtime": 1776598453.3729649,
+    "hash": "9341ac76dfc05a09d43f58f5ce9ba7fd"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\migration-fix-application-upsert-constraints.sql": {
+    "mtime": 1776161113.30002,
+    "hash": "84bf686ea465dfbdb41cc8849e023fa9"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\database\\schema.sql": {
+    "mtime": 1777710941.8276064,
+    "hash": "4fee60562d1357c775d31fc8ed37e642"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\db.js": {
+    "mtime": 1775995979.3823185,
+    "hash": "68a95969878390fcf83e6b001476b8e6"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\pool.js": {
+    "mtime": 1775209019.71657,
+    "hash": "e3fc124f092008bb0029893c04b6d25e"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\adminQueries.js": {
+    "mtime": 1777615666.811698,
+    "hash": "40665c17453e16cd78210eb7470c9569"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\authQueries.js": {
+    "mtime": 1774949441.6000302,
+    "hash": "33635d7a3ef6c559bd14962c570bf215"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\communicationQueries.js": {
+    "mtime": 1777384756.9886444,
+    "hash": "dcf5e9fbc1e75b178ff607daaf413a0a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\counselingQueries.js": {
+    "mtime": 1777622357.6981876,
+    "hash": "5102545b77462fd45390cd4b6a8ef415"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\leadQueries.js": {
+    "mtime": 1775491574.0146396,
+    "hash": "f4ee0b6652c10595108517bb125b9e4b"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\db\\queries\\userQueries.js": {
+    "mtime": 1777613627.1940682,
+    "hash": "3701b010e173a0c030236992f7649cd0"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\jobs\\scheduledEmailJob.js": {
+    "mtime": 1777303706.0799432,
+    "hash": "3066a34544ed039d5eede699b1bac671"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\middleware\\auth.js": {
+    "mtime": 1777623685.0394332,
+    "hash": "ef3d9aba4c7ac2f58f150f8ca2d220ed"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\middleware\\auth.middleware.js": {
+    "mtime": 1775995979.3763962,
+    "hash": "1bae566a4ddb3de77d5e7967358de356"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\middleware\\communicationUpload.js": {
+    "mtime": 1777294486.9152014,
+    "hash": "3349e3462b823f92ce96fde2611b01ef"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\middleware\\upload.js": {
+    "mtime": 1775492766.3370056,
+    "hash": "14d75ea2ffd6d6fce74b7a17f5c1c66e"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\middleware\\validateApplicationDocumentTypes.js": {
+    "mtime": 1776598258.295287,
+    "hash": "59ebbc9930f76adb142ddf9e7a93dfef"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\repositories\\lead.repository.js": {
+    "mtime": 1774786267.9827461,
+    "hash": "b8c8da57ae9229eef4eb5ec2c307dc3d"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\adminRoutes.js": {
+    "mtime": 1777615671.6103115,
+    "hash": "8fb340e1cbe4922947c4a1e57ac99d34"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\admissionRoutes.js": {
+    "mtime": 1775492766.3420255,
+    "hash": "90fb7bffd799308c9b38ab3759110daf"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\applicationRoutes.js": {
+    "mtime": 1777384148.7273555,
+    "hash": "2a37d4934922b87da8020d885fa5db6d"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\authRoutes.js": {
+    "mtime": 1774949445.1990573,
+    "hash": "540e8b4c4b6eb9c1d2ce030855c712aa"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\campaign.routes.js": {
+    "mtime": 1775995979.458457,
+    "hash": "0e0661d6a2e2c9db16653de493a99c6d"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\campaignRoutes.js": {
+    "mtime": 1775989952.6868267,
+    "hash": "b564cd1d36b794c83cf5826750db6b14"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\communicationRoutes.js": {
+    "mtime": 1777294486.8967552,
+    "hash": "c14da93bd8b96f5a9e7e4163cb0e36a0"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\counselingRoutes.js": {
+    "mtime": 1777622403.9432461,
+    "hash": "6e0376391283a43b83c48e3ce6161ec3"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\dashboardRoutes.js": {
+    "mtime": 1775493631.050017,
+    "hash": "6a82237800cd59c79ab34dadb6a09498"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\email.routes.js": {
+    "mtime": 1777207911.1711917,
+    "hash": "35ee91307c002c54f3a3031ae959b571"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\leadRoutes.js": {
+    "mtime": 1775392751.797454,
+    "hash": "cf891399031ac1ce031e4929b8159470"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\parentRoutes.js": {
+    "mtime": 1773566643.4748275,
+    "hash": "8510af5231bc2537e27e9fe6a2e5cd55"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\schoolRoutes.js": {
+    "mtime": 1777294063.4461794,
+    "hash": "e60e4f1d89883019dbfdb7ae69ec8752"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\sms.routes.js": {
+    "mtime": 1775995979.4083369,
+    "hash": "0d2d2e9d48a5d3f0b04b7b093e840fa2"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\studentRoutes.js": {
+    "mtime": 1773507806.4390368,
+    "hash": "ad9b6f2951003debd0c69614dc80b1f6"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\templateRoutes.js": {
+    "mtime": 1775989952.6658285,
+    "hash": "694e76e9741ca69ef772fcadbc3b2084"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\userRoutes.js": {
+    "mtime": 1777613636.1713226,
+    "hash": "9bd6d74b61e3a371e8f0251d5324a37c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\routes\\whatsapp.routes.js": {
+    "mtime": 1775995979.4083369,
+    "hash": "4aa79e2aefd51591c7e72cea1c8f824f"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\admissionService.js": {
+    "mtime": 1775492813.7139282,
+    "hash": "905ae02943fb3b0ec30b8fe9a8bb756b"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\applicationService.js": {
+    "mtime": 1777622578.0729172,
+    "hash": "6e37811d482d16a2f1dcab0cd3379dac"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\campaign.service.js": {
+    "mtime": 1775995979.3883328,
+    "hash": "9686681fb6dd89e5abe9b7f39a505aa7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\campaignService.js": {
+    "mtime": 1775990041.974315,
+    "hash": "4b237a1df363974e9387ba0599495d87"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\communicationService.js": {
+    "mtime": 1777636513.4680276,
+    "hash": "6023baabcf88646d62864381a148af88"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\email.service.js": {
+    "mtime": 1777297353.876175,
+    "hash": "fcb7bd961e802f912ae5dea9337dde97"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\lead.service.js": {
+    "mtime": 1774786267.999749,
+    "hash": "e3d4c1c8ef4f2546a646d03da14f0cdf"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\sms.service.js": {
+    "mtime": 1775995979.3843317,
+    "hash": "3b6b6f8ebf5df2bee273cb61d294aab4"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\templateService.js": {
+    "mtime": 1775989858.893152,
+    "hash": "5cbe3bd0ac03247dcfb9a5bcff2f4046"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\services\\whatsapp.service.js": {
+    "mtime": 1775995979.3873386,
+    "hash": "fc490dc0ed5ccb7fdc09b02090635daa"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\controllers\\dashboardController.js": {
+    "mtime": 1775493631.0465105,
+    "hash": "0bfe760167a4edcc902c8d692b62d0d7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\controllers\\funnelController.js": {
+    "mtime": 1775298069.708884,
+    "hash": "e3d144f667bfc505d09da243b8960bb7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\routes\\dashboardRoutes.js": {
+    "mtime": 1775209019.748489,
+    "hash": "0dd586ea1811d2586064c2382d44a211"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\routes\\funnelRoutes.js": {
+    "mtime": 1775491573.9180684,
+    "hash": "a46f8f0cb0e69057f29682b1b2aa081a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\services\\dashboardService.js": {
+    "mtime": 1775493859.1896548,
+    "hash": "b4f2be250378c7cd939797a097701ec7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\src\\services\\funnelService.js": {
+    "mtime": 1775298059.5042138,
+    "hash": "a55523c70c72542507d04e75f6f9ecfa"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777631404256-userRoutes.js": {
+    "mtime": 1777631404.3279972,
+    "hash": "9bd6d74b61e3a371e8f0251d5324a37c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\apiResponse.js": {
+    "mtime": 1775989550.7886548,
+    "hash": "395a623912cc447f16249eeff175f65f"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\appError.js": {
+    "mtime": 1775989550.7936163,
+    "hash": "0867244cc6ee682d1f4a2ebc4767df1f"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\applicationDocumentTypes.js": {
+    "mtime": 1776601546.7482133,
+    "hash": "8f860ca16af27e55df33910fac4d3055"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\communicationProviders.js": {
+    "mtime": 1775989550.8036194,
+    "hash": "8afb72b72d2c4ec26106d2f2a76a6be6"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\communicationValidation.js": {
+    "mtime": 1775989550.8106356,
+    "hash": "13bd6ccc1764fa5254586d694ac12acb"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\emailSender.js": {
+    "mtime": 1775990692.56457,
+    "hash": "2776a4b6f3e879ea21bd2e58857ab82c"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\logger.js": {
+    "mtime": 1775989550.7986157,
+    "hash": "fca8d479cfbae2a612913caa711a4812"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\smsSender.js": {
+    "mtime": 1775995979.3743827,
+    "hash": "aa5863004c972418caa3349b03cfc134"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\utils\\whatsappSender.js": {
+    "mtime": 1775995979.3743827,
+    "hash": "4380382bc1c4fbb50586c4a4218d14c6"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\API_DOCUMENTATION.md": {
+    "mtime": 1773335415.3350976,
+    "hash": "d6ea1d11d77501000c2ac31474a7ee16"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\BACKEND_README.md": {
+    "mtime": 1772719018.9731474,
+    "hash": "0c768ec8655b36174cdbc7b06c4e5897"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\DATABASE_SETUP.md": {
+    "mtime": 1772718928.3101501,
+    "hash": "cea5bdae7e416beb130708db3ebece55"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\FOLDER_STRUCTURE.md": {
+    "mtime": 1772719019.253226,
+    "hash": "68c11a109d3672e11dcb073380366571"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\parsed-statements.txt": {
+    "mtime": 1774950753.088651,
+    "hash": "9884e49664f932e3505f11b1e8186b93"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\SETUP_SUMMARY.md": {
+    "mtime": 1772719064.715808,
+    "hash": "ed95b4ff1646a0264fadad2a1c68aece"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\tmp_out.txt": {
+    "mtime": 1775995232.972143,
+    "hash": "fa59b51c0d64e0106ba239e22b93a917"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1776619422192-Screenshot_2025-11-08_at_2_03_17___PM.png": {
+    "mtime": 1776619422.2186422,
+    "hash": "28f3b7bbe7884e703934318620c90c50"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218705515-Screenshot_2025-12-06_165215.png": {
+    "mtime": 1777218705.5484216,
+    "hash": "3c859393e760913b8e9388f8e5b1638a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807425-Screenshot_2025-12-06_165215.png": {
+    "mtime": 1777218807.4477441,
+    "hash": "3c859393e760913b8e9388f8e5b1638a"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807431-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.4396596,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807433-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.4632468,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807456-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.518556,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807465-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.5138702,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807472-Screenshot_2024-06-24_081433.png": {
+    "mtime": 1777218807.526261,
+    "hash": "1c1eb104f13bf5e1dda6f82acd04dd8d"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807520-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.5363665,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777218807525-Screenshot_2025-03-22_230858.png": {
+    "mtime": 1777218807.5383687,
+    "hash": "884d7e0a28fc51555f2f0b7d673ca170"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777293967619-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777293967.672282,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295065050-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295065.0867045,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295298685-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295298.7292306,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295343842-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295343.953717,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295347557-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295347.5916433,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295370273-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295370.3799665,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295374118-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295374.3152592,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295385329-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295385.3977115,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295402091-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295402.407719,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295405114-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295405.2628028,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295408163-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295408.2189262,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295509472-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295509.4873195,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295565648-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295565.7879443,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295585477-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295585.5636823,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295690048-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295690.2018626,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777295763562-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777295763.603269,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777296140865-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777296140.9545834,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777297241021-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777297241.0865638,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777303012970-Screenshot_2023-11-27_133006.png": {
+    "mtime": 1777303013.0705194,
+    "hash": "e54f0761aeb0189ed0a0d80c31f0cea7"
+  },
+  "C:\\Users\\TANMAY GUNDRE\\Desktop\\erp_1\\School_WA\\backend\\uploads\\1777387277025-Screenshot_2025-11-08_at_2_03_17___PM.png": {
+    "mtime": 1777387277.1017928,
+    "hash": "28f3b7bbe7884e703934318620c90c50"
+  }
+}

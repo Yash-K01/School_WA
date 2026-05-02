@@ -1,4 +1,3 @@
-// ── Counseling.jsx ──────────────────────────────────────────
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -25,7 +24,7 @@ export function Counseling() {
     pendingTasks: 0,
   });
 
-  const [upcomingVisits, setUpcomingVisits] = useState([]);
+  const [futureVisits, setFutureVisits] = useState([]);
   const [missedVisits, setMissedVisits] = useState([]);
   const [editingVisit, setEditingVisit] = useState(null);
   const [assignedLeads, setAssignedLeads] = useState([]);
@@ -63,122 +62,132 @@ export function Counseling() {
     }
   };
 
-  // ── Data Fetching (useEffect) ──────────────────────────────
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // ── Data Fetching ──────────────────────────────────────────
+  const refreshVisits = useCallback(async (showLoading = false) => {
+    try {
+      if (showLoading) setLoading(true);
+      setError(null);
 
-        // Fetch stats and today's visits in parallel
-        const [statsResponse, visitsResponse, leadsResponse] = await Promise.all([
-          CounselingService.getDashboardStats(),
-          CounselingService.getVisits(true), // filterToday = true
-          CounselingService.getAssignedLeads(),
-        ]);
+      // Fetch stats and visits in parallel using updated fetch aliases
+      const [statsResponse, futureResponse, missedResponse, leadsResponse] = await Promise.all([
+        CounselingService.getDashboardStats(),
+        CounselingService.fetchFutureVisits(),
+        CounselingService.fetchMissedVisits(),
+        CounselingService.getAssignedLeads(),
+      ]);
 
-        // Handle stats response
-        if (statsResponse.success) {
-          setDashboardStats({
-            assignedLeads: statsResponse.data.assignedLeads || 0,
-            upcomingVisits: statsResponse.data.upcomingVisits || 0,
-            pendingTasks: statsResponse.data.pendingTasks || 0,
-          });
-        } else {
-          throw new Error(
-            statsResponse.message || "Failed to fetch dashboard stats",
-          );
-        }
-
-        // Handle visits response
-        if (visitsResponse.success) {
-          const formattedVisits = (visitsResponse.data || []).map((visit) => ({
-            id: visit.id,
-            student:
-              visit.student_name ||
-              visit.visitor_name ||
-              `${visit.first_name || ""} ${visit.last_name || ""}`.trim(),
-            grade: visit.grade || "N/A",
-            date: formatDate(visit.visit_date),
-            time: formatTime(visit.start_time || visit.visit_time || ""),
-            leadId: visit.lead_id,
-            status: visit.status,
-          }));
-          setVisits(formattedVisits);
-        } else {
-          throw new Error(visitsResponse.message || "Failed to fetch visits");
-        }
-
-        if (leadsResponse.success) {
-          const formattedLeads = (leadsResponse.data || []).map((lead) => ({
-            id: lead.lead_id,
-            name: lead.student_name || "Unknown",
-            grade: lead.desired_class || "N/A",
-            priority: lead.follow_up_status === "hot" ? "high" : "medium",
-            nextAction: "Follow-up",
-            dueDate: lead.created_at
-              ? new Date(lead.created_at).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : "Today",
-            phone: lead.phone,
-            email: lead.email,
-            parentName: lead.parent_name,
-            parentPhone: lead.parent_phone,
-          }));
-          setAssignedLeads(formattedLeads);
-        } else {
-          throw new Error(
-            leadsResponse.message || "Failed to fetch assigned leads",
-          );
-        }
-
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-
-        // Handle 401 Unauthorized - redirect to login
-        if (err.code === "UNAUTHORIZED" || err.status === 401) {
-          console.error("🔐 Authentication failed - redirecting to login");
-          localStorage.removeItem("token");
-          localStorage.removeItem("user_data");
-          navigate("/login", { replace: true, state: { from: "/counseling" } });
-          return;
-        }
-
-        // Handle no token error
-        if (err.code === "NO_TOKEN") {
-          console.error("🔐 No token found - redirecting to login");
-          navigate("/login", { replace: true, state: { from: "/counseling" } });
-          return;
-        }
-
-        // Handle network error
-        if (err.code === "NETWORK_ERROR") {
-          setError(
-            "Cannot reach the server. Please check your connection and try again.",
-          );
-          setLoading(false);
-          return;
-        }
-
-        // Generic error message
-        setError(
-          err.message || "Failed to load dashboard data. Please try again.",
-        );
-        setLoading(false);
+      if (statsResponse.success) {
+        setDashboardStats({
+          assignedLeads: statsResponse.data.assignedLeads || 0,
+          upcomingVisits: statsResponse.data.upcomingVisits || 0,
+          pendingTasks: statsResponse.data.pendingTasks || 0,
+        });
+      } else {
+        throw new Error(statsResponse.message || "Failed to fetch dashboard stats");
       }
-    };
 
-    fetchDashboardData();
-  }, []);
+      if (futureResponse.success) {
+        const formattedVisits = (futureResponse.data || []).map((visit) => ({
+          id: visit.id,
+          student:
+            visit.student_name ||
+            visit.visitor_name ||
+            `${visit.first_name || ""} ${visit.last_name || ""}`.trim(),
+          visitor: visit.visitor_name || "Unknown",
+          grade: visit.grade || "N/A",
+          date: formatDate(visit.visit_date),
+          rawDate: visit.visit_date,
+          time: formatTime(visit.start_time || visit.visit_time || ""),
+          leadId: visit.lead_id,
+          status: visit.status,
+        }));
+        
+        formattedVisits.sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
+        setFutureVisits(formattedVisits);
+      } else {
+        throw new Error(futureResponse.message || "Failed to fetch future visits");
+      }
+
+      if (missedResponse.success) {
+        const formattedVisits = (missedResponse.data || []).map((visit) => ({
+          id: visit.id,
+          student:
+            visit.student_name ||
+            visit.visitor_name ||
+            `${visit.first_name || ""} ${visit.last_name || ""}`.trim(),
+          visitor: visit.visitor_name || "Unknown",
+          grade: visit.grade || "N/A",
+          date: formatDate(visit.visit_date),
+          rawDate: visit.visit_date,
+          time: formatTime(visit.start_time || visit.visit_time || ""),
+          leadId: visit.lead_id,
+          status: visit.status,
+        }));
+        
+        formattedVisits.sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
+        setMissedVisits(formattedVisits);
+      } else {
+        throw new Error(missedResponse.message || "Failed to fetch missed visits");
+      }
+
+      if (leadsResponse.success) {
+        const formattedLeads = (leadsResponse.data || []).map((lead) => ({
+          id: lead.lead_id,
+          name: lead.student_name || "Unknown",
+          grade: lead.desired_class || "N/A",
+          priority: lead.follow_up_status === "hot" ? "high" : "medium",
+          nextAction: "Follow-up",
+          dueDate: lead.created_at
+            ? new Date(lead.created_at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
+            : "Today",
+          phone: lead.phone,
+          email: lead.email,
+          parentName: lead.parent_name,
+          parentPhone: lead.parent_phone,
+        }));
+        setAssignedLeads(formattedLeads);
+      } else {
+        throw new Error(leadsResponse.message || "Failed to fetch assigned leads");
+      }
+
+      if (showLoading) setLoading(false);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+
+      if (err.code === "UNAUTHORIZED" || err.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user_data");
+        navigate("/login", { replace: true, state: { from: "/counseling" } });
+        return;
+      }
+
+      if (err.code === "NO_TOKEN") {
+        navigate("/login", { replace: true, state: { from: "/counseling" } });
+        return;
+      }
+
+      if (err.code === "NETWORK_ERROR") {
+        setError("Cannot reach the server. Please check your connection and try again.");
+        if (showLoading) setLoading(false);
+        return;
+      }
+
+      setError(err.message || "Failed to load dashboard data. Please try again.");
+      if (showLoading) setLoading(false);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    refreshVisits(true);
+  }, [refreshVisits]);
 
   // ── Action Handlers ────────────────────────────────────────
   const handleMarkVisited = async (visitId) => {
     try {
       await CounselingService.updateVisitStatus(visitId, "visited");
-      // Re-fetch data to reflect changes instantly on the UI
       refreshVisits(false);
     } catch (err) {
       alert("Failed to update status");
@@ -189,7 +198,6 @@ export function Counseling() {
     if (window.confirm("Are you sure you want to delete this visit?")) {
       try {
         await CounselingService.deleteCampusVisit(visitId);
-        // Re-fetch data to reflect changes instantly on the UI
         refreshVisits(false);
       } catch (err) {
         alert("Failed to delete visit");
@@ -503,55 +511,58 @@ export function Counseling() {
           </div>
         </div>
 
-        {/* ── Upcoming Campus Visits ────────────────────────── */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Today's Campus Visits</div>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => navigate("/counseling/schedule-visit")}
-              title="Schedule a new campus visit"
-            >
-              <Plus size={14} /> Schedule Visit
-            </button>
-          </div>
-          <div className="card-body">
-            {visits.length > 0 ? (
-              visits.map((visit) => (
-                <div className="visit-card" key={visit.id}>
-                  <div className="visit-name">{visit.student}</div>
-                  <div className="visit-grade">{visit.grade}</div>
-                  <div className="visit-meta">
-                    <span>
-                      <Calendar size={13} /> {visit.date}
-                    </span>
-                    <span>
-                      <Clock size={13} /> {visit.time}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--gray-400)",
-                      marginTop: "6px",
-                    }}
-                  >
-                    Status: {visit.status}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p
-                style={{
-                  color: "var(--gray-400)",
-                  textAlign: "center",
-                  padding: "30px 0",
-                  fontSize: "14px",
-                }}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* ── Future Campus Visits ────────────────────────── */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Future Campus Visits</div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate("/counseling/schedule-visit")}
+                title="Schedule a new campus visit"
               >
-                No visits scheduled for today
-              </p>
-            )}
+                <Plus size={14} /> Schedule Visit
+              </button>
+            </div>
+            <div className="card-body">
+              {futureVisits?.length > 0 ? (
+                futureVisits.map(renderVisitCard)
+              ) : (
+                <p
+                  style={{
+                    color: "var(--gray-400)",
+                    textAlign: "center",
+                    padding: "30px 0",
+                    fontSize: "14px",
+                  }}
+                >
+                  No future visits scheduled
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Pending/Missed Visits ────────────────────────── */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Pending/Missed Visits</div>
+            </div>
+            <div className="card-body">
+              {missedVisits?.length > 0 ? (
+                missedVisits.map(renderVisitCard)
+              ) : (
+                <p
+                  style={{
+                    color: "var(--gray-400)",
+                    textAlign: "center",
+                    padding: "30px 0",
+                    fontSize: "14px",
+                  }}
+                >
+                  No pending or missed visits
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

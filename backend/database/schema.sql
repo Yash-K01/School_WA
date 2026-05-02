@@ -31,7 +31,7 @@ DROP TABLE IF EXISTS academic_year CASCADE;
 DROP TABLE IF EXISTS school CASCADE;
 -- ============================================================================
 -- TABLE 1: SCHOOL (Tenant)
--- ============================================================================
+-- ============================================================================ 
 -- Stores information about each school in the multi-tenant system
 CREATE TABLE school (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
