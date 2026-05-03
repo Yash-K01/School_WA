@@ -26,6 +26,7 @@ import campaignV2Routes from './routes/campaign.routes.js';
 import counselingRoutes from './routes/counselingRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import feesRoutes from './routes/feesRoutes.js';
 
 dotenv.config();
 
@@ -149,6 +150,9 @@ app.use('/api/users', userRoutes);
 
 // Admin routes
 app.use('/api/admin', adminRoutes);
+
+// Fees routes
+app.use('/api/fees', feesRoutes);
 
 // Funnel routes
 app.use('/api', funnelRoutes);

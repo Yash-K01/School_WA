@@ -15,6 +15,7 @@ import { MultiStepApplication } from "./pages/MultiStepApplication";
 import { Screening } from "./pages/Screening";
 import { OffersSeats } from "./pages/OffersSeats";
 import { FeesPayments } from "./pages/FeesPayments";
+import { InvoiceDetail } from "./pages/InvoiceDetail";
 import { Enrollment } from "./pages/Enrollment";
 import { Reports } from "./pages/Reports";
 import { Security } from "./pages/Security";
@@ -53,12 +54,16 @@ export default function App() {
           <Route path="counseling/schedule-visit" element={<ScheduleVisit />} />
           <Route path="applications" element={<Applications />} />
           <Route path="applications/create" element={<CreateApplication />} />
-          <Route path="applications/form/:id" element={<MultiStepApplication />} />
+          <Route
+            path="applications/form/:id"
+            element={<MultiStepApplication />}
+          />
           <Route path="application/:id" element={<MultiStepApplication />} />
           <Route path="applications/new" element={<NewApplication />} />
           <Route path="screening" element={<Screening />} />
           <Route path="offers-seats" element={<OffersSeats />} />
           <Route path="fees-payments" element={<FeesPayments />} />
+          <Route path="fees/invoice/:id" element={<InvoiceDetail />} />
           <Route path="enrollment" element={<Enrollment />} />
           <Route path="reports" element={<Reports />} />
           <Route path="security" element={<Security />} />
