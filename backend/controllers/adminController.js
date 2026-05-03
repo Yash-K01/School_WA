@@ -21,6 +21,10 @@ export const createUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
+    if (role === 'admin') {
+      return res.status(403).json({ success: false, message: 'Administrative roles must be provisioned by the Service Provider' });
+    }
+
     const existingUser = await authQueries.getUserByEmail(email);
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'Email already registered' });

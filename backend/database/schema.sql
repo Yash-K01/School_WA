@@ -6,6 +6,8 @@
 -- ============================================================================
 -- Drop existing tables if they exist (for clean setup)
 -- dependencies need to install npm install pg dotenv
+DROP TABLE IF EXISTS service_provider_staff CASCADE;
+
 DROP TABLE IF EXISTS payment CASCADE;
 
 DROP TABLE IF EXISTS invoice CASCADE;
@@ -52,6 +54,9 @@ CREATE TABLE school (
             'suspended'
         )
     ),
+    plan_type VARCHAR(50) DEFAULT 'trial',
+    is_active BOOLEAN DEFAULT TRUE,
+    expiry_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -2175,6 +2180,28 @@ CREATE TABLE scheduled_emails (
     status VARCHAR(20) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================================
+-- TABLE: SERVICE_PROVIDER_STAFF
+-- ============================================================================
+-- Table for internal platform management staff
+CREATE TABLE service_provider_staff (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    internal_role VARCHAR(50) DEFAULT 'staff' CHECK (internal_role IN ('super_admin', 'support', 'billing')),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+-- Speed up login lookups for your internal team
+CREATE INDEX idx_sp_staff_email ON service_provider_staff(email);
+
+-- Placeholder for your first Super Admin account
+INSERT INTO service_provider_staff (full_name, email, password_hash, internal_role)
+VALUES ('Platform Owner', 'admin@your-saas-provider.com', '$2b$10$YourHashedPasswordExample', 'super_admin');
 
 -- ============================================================================
 -- SQL Script ends

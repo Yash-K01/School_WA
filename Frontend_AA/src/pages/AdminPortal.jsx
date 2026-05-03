@@ -14,7 +14,7 @@ export function AdminPortal() {
   const [showResetModal, setShowResetModal] = useState(null); // stores user id
 
   // Form state
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "counselor" });
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "staff(counselor)" });
   const [resetPassword, setResetPassword] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [successToast, setSuccessToast] = useState("");
@@ -47,7 +47,7 @@ export function AdminPortal() {
     try {
       await createAdminUser(newUser);
       setShowCreateModal(false);
-      setNewUser({ name: "", email: "", password: "", role: "counselor" });
+      setNewUser({ name: "", email: "", password: "", role: "staff(counselor)" });
       loadUsers();
       showToast("User Created successfully!");
     } catch (err) {
@@ -251,9 +251,8 @@ export function AdminPortal() {
                   value={newUser.role} 
                   onChange={e => setNewUser({...newUser, role: e.target.value})}
                 >
-                  <option value="admin">Admin</option>
-                  <option value="counselor">Staff (Counselor)</option>
-                  <option value="accountant">Staff (Accountant)</option>
+                  <option value="staff(counselor)">Staff (Counselor)</option>
+                  <option value="staff(accountant)">Staff (Accountant)</option>
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
